@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Portal de Trámites Digitales · Costa Rica</title>
-<meta name="description" content="Accesos directos a los sitios oficiales para gestionar trámites de salud, pagos, Registro Nacional y otros servicios del Estado costarricense." />
+<meta name="description" content="Dashboard de trámites, gestor de pagos e instrucciones internas para servicios digitales del Estado costarricense." />
 
 <!-- Tailwind CSS vía CDN (requerido: sin build step, listo para GitHub Pages) -->
 <script src="https://cdn.tailwindcss.com"></script>
@@ -13,8 +13,9 @@
   /* ==========================================================================
      ESTILOS COMPLEMENTARIOS A TAILWIND
      Tailwind cubre casi todo el layout/espaciado/tipografía. Aquí solo van:
-     el fondo con gradiente, el efecto "glass" (glassmorphism) y pequeñas
-     animaciones que no existen como utilidades nativas de Tailwind CDN.
+     el fondo con gradiente, el efecto "glass" (glassmorphism), las pestañas,
+     las etiquetas de categoría/estado y pequeñas animaciones que no existen
+     como utilidades nativas de Tailwind CDN.
      ========================================================================== */
   :root {
     --accent: #E8503A;       /* coral — color de acción principal */
@@ -23,13 +24,11 @@
   }
 
   body {
-    /* Fondo degradado tipo "corporate dashboard" en vez de un color plano */
     background: linear-gradient(160deg, #0B1B33 0%, #123A5E 55%, #0E2E4E 100%);
     background-attachment: fixed;
     min-height: 100vh;
   }
 
-  /* Tarjeta de vidrio esmerilado (glassmorphism) */
   .glass {
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.12);
@@ -43,228 +42,626 @@
     -webkit-backdrop-filter: blur(20px);
   }
 
-  .card-hover {
-    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-  }
+  .card-hover { transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
   .card-hover:hover {
     transform: translateY(-3px);
     border-color: rgba(255, 255, 255, 0.28);
     box-shadow: 0 16px 34px -14px rgba(0, 0, 0, 0.55);
   }
 
-  .pill {
-    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-  }
+  .pill { transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease; }
 
-  /* Barra de scroll discreta, coherente con el tema oscuro */
   ::-webkit-scrollbar { width: 10px; }
   ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 999px; }
 
-  /* Pequeño destello al copiar el dato del cliente */
-  .flash-success {
-    animation: flash 0.6s ease;
-  }
+  .flash-success { animation: flash 0.6s ease; }
   @keyframes flash {
     0%   { box-shadow: 0 0 0 3px rgba(52, 209, 191, 0.55); }
     100% { box-shadow: 0 0 0 0 rgba(52, 209, 191, 0); }
   }
 
-  @keyframes toast-in {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   #toast { animation: toast-in 0.18s ease; }
+
+  /* ---- Menú superior de pestañas ---- */
+  .tab-btn {
+    padding: .55rem 1.1rem;
+    border-radius: .75rem;
+    font-size: .875rem;
+    font-weight: 600;
+    color: #CBD5E1;
+    white-space: nowrap;
+    transition: background .15s ease, color .15s ease;
+  }
+  .tab-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .tab-btn.is-active { background: var(--accent); color: #fff; }
+
+  /* ---- Insumo de formulario reutilizable (glass) ---- */
+  .campo-glass {
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.20);
+    border-radius: .75rem;
+    padding: .65rem 1rem;
+    font-size: .875rem;
+    color: #fff;
+  }
+  .campo-glass::placeholder { color: #94A3B8; }
+  .campo-glass:focus { outline: none; box-shadow: 0 0 0 2px var(--accent-2); border-color: transparent; }
+  .campo-glass option { color: #0B1B33; }
+
+  /* ---- Etiquetas de categoría (mismos colores que las tarjetas del Dashboard) ---- */
+  .badge-Salud             { background:#2DD4BF22; color:#2DD4BF; border:1px solid #2DD4BF55; }
+  .badge-Pagos             { background:#F5A62322; color:#F5A623; border:1px solid #F5A62355; }
+  .badge-Registro-Nacional { background:#8B7CF622; color:#8B7CF6; border:1px solid #8B7CF655; }
+  .badge-Varios            { background:#FB718522; color:#FB7185; border:1px solid #FB718555; }
+
+  /* ---- Etiquetas de estado de pago ---- */
+  .estado-pagado  { background:#22C55E22; color:#4ADE80; border:1px solid #22C55E55; }
+  .estado-espera  { background:#F5A62322; color:#FBBF24; border:1px solid #F5A62355; }
+  .estado-vencido { background:#EF444433; color:#FCA5A5; border:1px solid #EF444488; animation: pulso-rojo 1.6s infinite; }
+  @keyframes pulso-rojo { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+
+  .fila-espera  { border-left: 4px solid #F5A623; background: rgba(245,166,35,0.05); }
+  .fila-vencida { border-left: 4px solid #EF4444; background: rgba(239,68,68,0.08); }
 </style>
 </head>
 
 <body class="text-slate-100 font-sans antialiased">
 
+  <!-- ===================== MENÚ SUPERIOR (3 pestañas) ===================== -->
+  <nav class="sticky top-0 z-40 glass-strong border-b border-white/10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-1 py-3 overflow-x-auto">
+      <span class="text-sm font-bold text-white mr-3 whitespace-nowrap hidden sm:inline">🗂️ Trámites CR</span>
+      <button type="button" class="tab-btn is-active" data-tab="dashboard">Dashboard</button>
+      <button type="button" class="tab-btn" data-tab="pagos">Gestor de Pagos</button>
+      <button type="button" class="tab-btn" data-tab="instrucciones">Instrucciones</button>
+    </div>
+  </nav>
+
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
 
-    <!-- ===================== ENCABEZADO ===================== -->
+    <!-- ===================== ENCABEZADO (cambia de texto según la pestaña) ===================== -->
     <header class="mb-8">
-      <p class="text-xs font-semibold tracking-[0.2em] uppercase text-[var(--accent-2)] mb-2">
+      <p id="page-eyebrow" class="text-xs font-semibold tracking-[0.2em] uppercase text-[var(--accent-2)] mb-2">
         Panel ciudadano · Costa Rica
       </p>
-      <h1 class="text-3xl sm:text-4xl font-bold tracking-tight text-white">
+      <h1 id="page-titulo" class="text-3xl sm:text-4xl font-bold tracking-tight text-white">
         Portal de Trámites Digitales
       </h1>
-      <p class="mt-2 text-slate-300 max-w-2xl text-sm sm:text-base">
+      <p id="page-subtitulo" class="mt-2 text-slate-300 max-w-2xl text-sm sm:text-base">
         Accesos directos a los sitios oficiales para gestionar trámites de salud, pagos,
         Registro Nacional y otros servicios del Estado. Busca por nombre o filtra por categoría.
       </p>
     </header>
 
-    <!-- ===================== DATOS DEL CLIENTE + COPIAR ===================== -->
-    <section class="glass-strong rounded-2xl p-5 sm:p-6 mb-6" id="panel-cliente">
-      <label for="input-cliente" class="block text-sm font-semibold text-slate-200 mb-2">
-        Datos del Cliente (Cédula/Correo)
-      </label>
-      <div class="flex flex-col sm:flex-row gap-3">
-        <input
-          id="input-cliente"
-          type="text"
-          inputmode="text"
-          autocomplete="off"
-          placeholder="Ej: 1-2345-6789 o cliente@correo.com"
-          class="flex-1 rounded-xl bg-white/10 border border-white/20 px-4 py-3 text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-2)] focus:border-transparent"
-        />
-        <button
-          id="btn-copiar"
-          type="button"
-          class="shrink-0 rounded-xl px-5 py-3 text-sm font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-dark)] transition-colors"
-        >
-          Copiar
-        </button>
+    <!-- =========================================================================
+         PESTAÑA 1 · DASHBOARD
+    ========================================================================== -->
+    <section id="tab-dashboard">
+
+      <!-- Datos del cliente + copiar -->
+      <section class="glass-strong rounded-2xl p-5 sm:p-6 mb-6" id="panel-cliente">
+        <label for="input-cliente" class="block text-sm font-semibold text-slate-200 mb-2">
+          Datos del Cliente (Cédula/Correo)
+        </label>
+        <div class="flex flex-col sm:flex-row gap-3">
+          <input id="input-cliente" type="text" autocomplete="off" placeholder="Ej: 1-2345-6789 o cliente@correo.com"
+            class="campo-glass flex-1" />
+          <button id="btn-copiar" type="button"
+            class="shrink-0 rounded-xl px-5 py-3 text-sm font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-dark)] transition-colors">
+            Copiar
+          </button>
+        </div>
+        <p class="mt-2 text-xs text-slate-400">
+          Escribe aquí la cédula o el correo del cliente. Se reutiliza automáticamente al abrir la pestaña
+          "Gestor de Pagos" para que no lo tengas que escribir dos veces.
+        </p>
+      </section>
+
+      <!-- Buscador + filtros de categoría -->
+      <section class="glass rounded-2xl p-4 sm:p-5 mb-6 flex flex-col gap-4">
+        <div class="relative">
+          <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m0 0a7.5 7.5 0 1 0-10.6 0 7.5 7.5 0 0 0 10.6 0Z" />
+          </svg>
+          <input id="input-buscar" type="text" autocomplete="off" placeholder="Buscar trámite por nombre…"
+            class="campo-glass w-full pl-11" />
+        </div>
+        <div id="filtros-categoria" class="flex flex-wrap gap-2"></div>
+      </section>
+
+      <p id="contador-resultados" class="text-sm text-slate-400 mb-4" aria-live="polite"></p>
+
+      <section id="grid-tramites" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5"></section>
+
+      <p id="estado-vacio" class="hidden text-center text-slate-400 py-16">
+        No se encontraron trámites con ese criterio. Prueba con otro término o quita el filtro de categoría.
+      </p>
+
+      <footer class="mt-12 pt-6 border-t border-white/10 text-xs text-slate-400 leading-relaxed">
+        <p>
+          ⚠ Cada botón "Ir al sitio oficial" abre la página real de la institución en una pestaña nueva.
+          Verifica siempre que la dirección (URL) corresponda al dominio oficial antes de ingresar datos
+          personales o realizar pagos. Este panel no envía a ningún servidor los datos del cliente ni de
+          los pagos: todo vive en tu navegador (localStorage).
+        </p>
+      </footer>
+    </section>
+
+    <!-- =========================================================================
+         PESTAÑA 2 · GESTOR DE PAGOS
+    ========================================================================== -->
+    <section id="tab-pagos" style="display:none;">
+
+      <!-- Respaldo de datos -->
+      <section class="glass rounded-2xl p-4 sm:p-5 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <p class="text-xs text-slate-400 leading-relaxed max-w-xl">
+          Los pagos se guardan en este navegador y <strong class="text-slate-200">no se borran al actualizar este
+          archivo HTML</strong> (localStorage no depende del contenido del archivo, solo del navegador y el sitio).
+          Aun así, descarga un respaldo de vez en cuando por seguridad.
+        </p>
+        <div class="flex gap-2 shrink-0">
+          <button id="btn-exportar-pagos" type="button"
+            class="rounded-xl px-4 py-2 text-xs font-semibold bg-white/10 hover:bg-white/20 border border-white/15 transition-colors">
+            ⬇ Descargar respaldo
+          </button>
+          <button id="btn-importar-pagos" type="button"
+            class="rounded-xl px-4 py-2 text-xs font-semibold bg-white/10 hover:bg-white/20 border border-white/15 transition-colors">
+            ⬆ Restaurar respaldo
+          </button>
+          <input type="file" id="input-restaurar-pagos" accept="application/json" class="hidden" />
+        </div>
+      </section>
+
+      <!-- Banner de alertas (cobros pendientes hace mucho tiempo) -->
+      <section id="alertas-pagos" class="hidden mb-6 rounded-2xl p-4 sm:p-5 border border-red-400/50 bg-red-500/10 text-sm text-red-100">
+        <!-- Contenido generado por JS: revisarAlertas() -->
+      </section>
+
+      <!-- Formulario: registrar transacción -->
+      <form id="form-pago" class="glass-strong rounded-2xl p-5 sm:p-6 mb-6" novalidate>
+        <h2 class="text-base font-semibold text-white mb-4">Registrar transacción</h2>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <label class="flex flex-col gap-1.5 text-xs font-semibold text-slate-300">
+            Servicio
+            <select id="pago-servicio" class="campo-glass" required>
+              <option value="" disabled selected>Selecciona un servicio…</option>
+            </select>
+          </label>
+
+          <label class="flex flex-col gap-1.5 text-xs font-semibold text-slate-300">
+            Cliente
+            <input id="pago-cliente" type="text" placeholder="Nombre del cliente" class="campo-glass" required />
+          </label>
+
+          <label class="flex flex-col gap-1.5 text-xs font-semibold text-slate-300">
+            Monto (₡)
+            <input id="pago-monto" type="number" min="0" step="0.01" placeholder="0.00" class="campo-glass" required />
+          </label>
+
+          <label class="flex flex-col gap-1.5 text-xs font-semibold text-slate-300">
+            Estado
+            <select id="pago-estado" class="campo-glass" required>
+              <option value="En espera" selected>En espera</option>
+              <option value="Pagado">Pagado</option>
+            </select>
+          </label>
+        </div>
+
+        <!-- Solo visible si el usuario elige "Otro" en el select de servicio -->
+        <div id="pago-servicio-otro-wrap" class="mt-4" style="display:none;">
+          <label class="flex flex-col gap-1.5 text-xs font-semibold text-slate-300 max-w-md">
+            Nombre del servicio (manual)
+            <input id="pago-servicio-otro" type="text" placeholder="Escribe el nombre del trámite" class="campo-glass" />
+          </label>
+        </div>
+
+        <p id="form-pago-error" class="mt-3 text-sm text-red-300" role="alert"></p>
+
+        <div class="mt-4">
+          <button type="submit" class="rounded-xl px-5 py-2.5 text-sm font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-dark)] transition-colors">
+            Guardar
+          </button>
+        </div>
+      </form>
+
+      <!-- Filtros: por día y por estado -->
+      <section class="glass rounded-2xl p-4 sm:p-5 mb-4 flex flex-col gap-4">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs font-semibold text-slate-400 mr-1">Ver:</span>
+          <div id="filtros-dia" class="flex flex-wrap gap-2"></div>
+          <div class="flex items-center gap-2 ml-auto">
+            <label for="filtro-fecha" class="text-xs text-slate-400">O un día exacto:</label>
+            <input type="date" id="filtro-fecha" class="campo-glass" />
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <label for="filtro-estado-pago" class="text-xs font-semibold text-slate-400">Estado:</label>
+          <select id="filtro-estado-pago" class="campo-glass">
+            <option value="todos">Todos</option>
+            <option value="En espera">En espera</option>
+            <option value="Pagado">Pagado</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- Resumen de totales del filtro actual -->
+      <section id="resumen-pagos" class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6"></section>
+
+      <!-- Tabla de pagos -->
+      <section class="glass rounded-2xl overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b border-white/10">
+              <th class="px-4 py-3">Fecha</th>
+              <th class="px-4 py-3">Servicio</th>
+              <th class="px-4 py-3">Cliente</th>
+              <th class="px-4 py-3 text-right">Monto</th>
+              <th class="px-4 py-3">Estado</th>
+              <th class="px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody id="tabla-pagos-body"></tbody>
+        </table>
+        <p id="pagos-empty" class="hidden text-center text-slate-400 py-14 text-sm">
+          No hay pagos registrados todavía (o ninguno coincide con el filtro actual).
+        </p>
+      </section>
+    </section>
+
+    <!-- =========================================================================
+         PESTAÑA 3 · INSTRUCCIONES
+         ---------------------------------------------------------------------
+         Cada trámite tiene su propio bloque <article class="instruccion-servicio">.
+         Para agregar un servicio nuevo: copia un bloque completo (desde <article
+         hasta </article>), pégalo antes de </div> (cierre de #contenedor-instrucciones)
+         y edita el texto. No hace falta tocar JavaScript para esto.
+    ========================================================================== -->
+    <section id="tab-instrucciones" style="display:none;">
+
+      <section class="glass rounded-2xl p-4 sm:p-5 mb-6">
+        <div class="relative">
+          <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m0 0a7.5 7.5 0 1 0-10.6 0 7.5 7.5 0 0 0 10.6 0Z" />
+          </svg>
+          <input id="buscar-instrucciones" type="text" autocomplete="off" placeholder="Buscar instrucciones por nombre de servicio…"
+            class="campo-glass w-full pl-11" />
+        </div>
+      </section>
+
+      <div id="contenedor-instrucciones" class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+        <!-- ---------- Salud ---------- -->
+        <article class="instruccion-servicio glass rounded-2xl p-5" data-nombre="CCSS · Citas médicas (EDUS)">
+          <span class="badge-Salud inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-3">Salud</span>
+          <h3 class="text-base font-semibold text-white mb-3">CCSS · Citas médicas (EDUS)</h3>
+          <div class="text-sm text-slate-300 space-y-3 leading-relaxed">
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Pasos</p>
+              <ol class="list-decimal list-inside space-y-1">
+                <li>Abre el sitio oficial de EDUS Citas desde el botón de la pestaña Dashboard.</li>
+                <li>Inicia sesión con el usuario del asegurado, o regístrate si es la primera vez con el número de cédula.</li>
+                <li>Elige el área de salud y el tipo de cita que necesita el cliente.</li>
+                <li>Selecciona fecha y hora disponibles y confirma.</li>
+                <li>Guarda o imprime el comprobante de la cita.</li>
+              </ol>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Requisitos</p>
+              <p>Cédula o DIMEX vigente; correo electrónico registrado en la CCSS.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Notas</p>
+              <p>Si el cliente nunca se ha registrado en EDUS, debe acudir primero a su centro de salud para activar la cuenta.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="instruccion-servicio glass rounded-2xl p-5" data-nombre="CCSS · Oficina Virtual">
+          <span class="badge-Salud inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-3">Salud</span>
+          <h3 class="text-base font-semibold text-white mb-3">CCSS · Oficina Virtual</h3>
+          <div class="text-sm text-slate-300 space-y-3 leading-relaxed">
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Pasos</p>
+              <ol class="list-decimal list-inside space-y-1">
+                <li>Entra a la Oficina Virtual CCSS.</li>
+                <li>Si es la primera vez, haz clic en "Quiero registrarme" e ingresa cédula, correo y teléfono.</li>
+                <li>Selecciona el trámite: incapacidades, orden patronal o aportes.</li>
+                <li>Descarga el documento o completa la gestión solicitada.</li>
+              </ol>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Requisitos</p>
+              <p>Cédula vigente, correo electrónico personal, número de celular activo.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Notas</p>
+              <p>El acceso puede pedir doble factor de autenticación; avisa al cliente para que tenga el celular a mano.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="instruccion-servicio glass rounded-2xl p-5" data-nombre="CCSS · Portal institucional">
+          <span class="badge-Salud inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-3">Salud</span>
+          <h3 class="text-base font-semibold text-white mb-3">CCSS · Portal institucional</h3>
+          <div class="text-sm text-slate-300 space-y-3 leading-relaxed">
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Cuándo usarlo</p>
+              <p>Es el punto de entrada general. Úsalo cuando el cliente no sepa exactamente qué servicio necesita: desde ahí se llega a EDUS, la Oficina Virtual, pensiones y validación de derechos.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Notas</p>
+              <p>Buena página de aterrizaje mientras identificas el trámite exacto junto con el cliente.</p>
+            </div>
+          </div>
+        </article>
+
+        <!-- ---------- Pagos ---------- -->
+        <article class="instruccion-servicio glass rounded-2xl p-5" data-nombre="INS · Marchamo (Derecho de Circulación)">
+          <span class="badge-Pagos inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-3">Pagos</span>
+          <h3 class="text-base font-semibold text-white mb-3">INS · Marchamo</h3>
+          <div class="text-sm text-slate-300 space-y-3 leading-relaxed">
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Pasos</p>
+              <ol class="list-decimal list-inside space-y-1">
+                <li>Entra al portal del Marchamo.</li>
+                <li>Ingresa el número de placa (sin espacios ni guiones) y el tipo de vehículo.</li>
+                <li>Revisa el desglose del monto (SOA, impuestos, multas si las hay).</li>
+                <li>Si la Revisión Técnica Vehicular está al día, paga en línea con tarjeta.</li>
+                <li>Guarda el comprobante de pago.</li>
+              </ol>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Requisitos</p>
+              <p>Número de placa; Revisión Técnica Vehicular (RTV) vigente para completar el pago.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Notas</p>
+              <p>A inicios de noviembre el sistema suele saturarse. Si está lento, sugiere intentar desde el celular.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="instruccion-servicio glass rounded-2xl p-5" data-nombre="Hacienda · TRIBU-CR">
+          <span class="badge-Pagos inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-3">Pagos</span>
+          <h3 class="text-base font-semibold text-white mb-3">Hacienda · TRIBU-CR</h3>
+          <div class="text-sm text-slate-300 space-y-3 leading-relaxed">
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Pasos</p>
+              <ol class="list-decimal list-inside space-y-1">
+                <li>Entra al portal de TRIBU-CR / Ministerio de Hacienda.</li>
+                <li>Inicia sesión con las credenciales tributarias, o regístrate si es la primera vez.</li>
+                <li>Ubica la declaración o el pago correspondiente.</li>
+                <li>Completa los datos solicitados y confirma.</li>
+                <li>Descarga el comprobante.</li>
+              </ol>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Requisitos</p>
+              <p>Cédula física o jurídica; usuario y contraseña de Hacienda.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Notas</p>
+              <p>TRIBU-CR está reemplazando gradualmente al antiguo sistema ATV. Si el cliente tiene dudas, revisa la sección de ayuda del propio sitio.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="instruccion-servicio glass rounded-2xl p-5" data-nombre="Grupo INS · Seguros en línea">
+          <span class="badge-Pagos inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-3">Pagos</span>
+          <h3 class="text-base font-semibold text-white mb-3">Grupo INS · Seguros en línea</h3>
+          <div class="text-sm text-slate-300 space-y-3 leading-relaxed">
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Pasos</p>
+              <ol class="list-decimal list-inside space-y-1">
+                <li>Entra a INS en Línea.</li>
+                <li>Regístrate para obtener usuario y contraseña, si no tienes cuenta.</li>
+                <li>En "Mi perfil" revisa las pólizas activas.</li>
+                <li>Selecciona la póliza a pagar y elige el método de pago.</li>
+              </ol>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Requisitos</p>
+              <p>Número de póliza o cédula del asegurado.</p>
+            </div>
+          </div>
+        </article>
+
+        <!-- ---------- Registro Nacional ---------- -->
+        <article class="instruccion-servicio glass rounded-2xl p-5" data-nombre="RNP Digital · Consultas y certificaciones">
+          <span class="badge-Registro-Nacional inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-3">Registro Nacional</span>
+          <h3 class="text-base font-semibold text-white mb-3">RNP Digital · Consultas y certificaciones</h3>
+          <div class="text-sm text-slate-300 space-y-3 leading-relaxed">
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Pasos</p>
+              <ol class="list-decimal list-inside space-y-1">
+                <li>Entra a RNP Digital.</li>
+                <li>Regístrate con correo y cédula si no tienes cuenta.</li>
+                <li>En "Certificaciones y consultas gratuitas" busca por cédula o nombre completo.</li>
+                <li>Si necesitas un documento con valor legal, genera la certificación digital (tiene costo).</li>
+              </ol>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Requisitos</p>
+              <p>Cédula o nombre completo de la persona a consultar.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Notas</p>
+              <p>La consulta básica es gratuita; solo las certificaciones formales tienen costo.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="instruccion-servicio glass rounded-2xl p-5" data-nombre="Registro Nacional · Estado de trámites">
+          <span class="badge-Registro-Nacional inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-3">Registro Nacional</span>
+          <h3 class="text-base font-semibold text-white mb-3">Registro Nacional · Estado de trámites</h3>
+          <div class="text-sm text-slate-300 space-y-3 leading-relaxed">
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Pasos</p>
+              <ol class="list-decimal list-inside space-y-1">
+                <li>Entra a la sección de Gestiones y Consultas del Registro Nacional.</li>
+                <li>Ingresa el número de trámite o documento presentado.</li>
+                <li>Revisa el estado: en trámite, inscrito, con defecto, etc.</li>
+              </ol>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Requisitos</p>
+              <p>Número de trámite o de documento.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="instruccion-servicio glass rounded-2xl p-5" data-nombre="Registro Nacional · Otros servicios en línea">
+          <span class="badge-Registro-Nacional inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-3">Registro Nacional</span>
+          <h3 class="text-base font-semibold text-white mb-3">Registro Nacional · Otros servicios</h3>
+          <div class="text-sm text-slate-300 space-y-3 leading-relaxed">
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Cuándo usarlo</p>
+              <p>Revisa este listado cuando el trámite que necesita el cliente no sea una consulta de bienes ni un seguimiento de documento: agrupa servicios adicionales del Registro.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Notas</p>
+              <p>Los requisitos varían según el servicio específico que elija el cliente dentro de esta sección.</p>
+            </div>
+          </div>
+        </article>
+
+        <!-- ---------- Varios ---------- -->
+        <article class="instruccion-servicio glass rounded-2xl p-5" data-nombre="TSE · Servicios en línea">
+          <span class="badge-Varios inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-3">Varios</span>
+          <h3 class="text-base font-semibold text-white mb-3">TSE · Servicios en línea</h3>
+          <div class="text-sm text-slate-300 space-y-3 leading-relaxed">
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Pasos</p>
+              <ol class="list-decimal list-inside space-y-1">
+                <li>Entra a los Servicios en línea del TSE.</li>
+                <li>Elige el trámite: consulta de cédula, matrimonio digital, padrón electoral, etc.</li>
+                <li>Sigue las instrucciones específicas de cada servicio.</li>
+              </ol>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Requisitos</p>
+              <p>Cédula de identidad.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Notas</p>
+              <p>La primera cédula y la renovación tras más de un año vencida requieren trámite presencial.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="instruccion-servicio glass rounded-2xl p-5" data-nombre="TSE · Estado de solicitud de cédula">
+          <span class="badge-Varios inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-3">Varios</span>
+          <h3 class="text-base font-semibold text-white mb-3">TSE · Estado de solicitud de cédula</h3>
+          <div class="text-sm text-slate-300 space-y-3 leading-relaxed">
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Pasos</p>
+              <ol class="list-decimal list-inside space-y-1">
+                <li>Entra al sistema de consulta de estado de solicitud.</li>
+                <li>Ingresa el número de cédula o el número de solicitud.</li>
+                <li>Revisa en qué etapa está el trámite.</li>
+              </ol>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Requisitos</p>
+              <p>Número de cédula o de solicitud.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="instruccion-servicio glass rounded-2xl p-5" data-nombre="Correos de Costa Rica · Rastreo de envíos">
+          <span class="badge-Varios inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-3">Varios</span>
+          <h3 class="text-base font-semibold text-white mb-3">Correos de Costa Rica · Rastreo</h3>
+          <div class="text-sm text-slate-300 space-y-3 leading-relaxed">
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Pasos</p>
+              <ol class="list-decimal list-inside space-y-1">
+                <li>Entra al rastreador de Correos de Costa Rica.</li>
+                <li>Ingresa el número de guía (aparece en el comprobante de envío).</li>
+                <li>Consulta el estado y la ubicación del paquete.</li>
+              </ol>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Requisitos</p>
+              <p>Número de guía del envío.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-200 mb-1">Notas</p>
+              <p>Los envíos internacionales con código que inicia en "R" pueden tardar hasta 60 días naturales tras salir de aduanas.</p>
+            </div>
+          </div>
+        </article>
+
       </div>
-      <p class="mt-2 text-xs text-slate-400">
-        Escribe aquí la cédula o el correo del cliente una sola vez y usa "Copiar" para pegarlo
-        rápido en los formularios de las páginas oficiales que abras abajo.
+
+      <p id="instrucciones-vacio" class="hidden text-center text-slate-400 py-16">
+        Ningún servicio coincide con tu búsqueda.
       </p>
     </section>
 
-    <!-- ===================== BUSCADOR + FILTROS DE CATEGORÍA ===================== -->
-    <section class="glass rounded-2xl p-4 sm:p-5 mb-6 flex flex-col gap-4">
-      <div class="relative">
-        <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m0 0a7.5 7.5 0 1 0-10.6 0 7.5 7.5 0 0 0 10.6 0Z" />
-        </svg>
-        <input
-          id="input-buscar"
-          type="text"
-          autocomplete="off"
-          placeholder="Buscar trámite por nombre…"
-          class="w-full rounded-xl bg-white/10 border border-white/20 pl-11 pr-4 py-3 text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-2)] focus:border-transparent"
-        />
-      </div>
-      <!-- Los "pills" de categoría se generan dinámicamente desde script.js (ver TRAMITES) -->
-      <div id="filtros-categoria" class="flex flex-wrap gap-2"></div>
-    </section>
-
-    <p id="contador-resultados" class="text-sm text-slate-400 mb-4" aria-live="polite"></p>
-
-    <!-- ===================== GRID DE TARJETAS ===================== -->
-    <section id="grid-tramites" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-      <!-- Tarjetas generadas dinámicamente por JS -->
-    </section>
-
-    <p id="estado-vacio" class="hidden text-center text-slate-400 py-16">
-      No se encontraron trámites con ese criterio. Prueba con otro término o quita el filtro de categoría.
-    </p>
-
-    <footer class="mt-12 pt-6 border-t border-white/10 text-xs text-slate-400 leading-relaxed">
-      <p>
-        ⚠ Cada botón "Ir al sitio oficial" abre la página real de la institución en una pestaña nueva.
-        Verifica siempre que la dirección (URL) corresponda al dominio oficial antes de ingresar datos
-        personales o realizar pagos. Este panel no almacena ni envía a ningún servidor los datos del cliente:
-        solo viven en tu navegador mientras tienes la página abierta.
-      </p>
-    </footer>
   </div>
 
-  <!-- Notificación flotante (copiar, errores de búsqueda, etc.) -->
+  <!-- Notificación flotante -->
   <div id="toast" class="hidden fixed bottom-5 right-5 z-50 rounded-xl px-4 py-3 text-sm font-medium text-white shadow-xl"></div>
 
 <script>
 /* ============================================================================
    PORTAL DE TRÁMITES DIGITALES — LÓGICA (JavaScript ES6 puro, sin librerías)
+   --------------------------------------------------------------------------
    Índice:
-     1. Datos de trámites (edítalos aquí para agregar/quitar tarjetas)
-     2. Estado y referencias al DOM
-     3. Utilidades (normalizar texto, toast, escapar HTML)
-     4. Filtros de categoría (pills)
-     5. Render del grid de tarjetas
-     6. Buscador en tiempo real
-     7. Copiar datos del cliente
+     1. Configuración global
+     2. Datos de trámites (fuente única para el Dashboard y el <select> de pagos)
+     3. Utilidades compartidas
+     4. Navegación entre pestañas (display: none / block, sin frameworks)
+     5. Módulo Dashboard (buscador + filtro de categoría + tarjetas)
+     6. Módulo Gestor de Pagos (CRUD + localStorage + filtros + alertas)
+     7. Módulo Instrucciones (buscador sobre bloques HTML estáticos)
      8. Inicialización
    ============================================================================ */
 
-/* -------------------- 1. DATOS DE TRÁMITES --------------------
-   Para agregar un trámite nuevo, copia un objeto y cambia sus valores.
-   "categoria" debe ser una de las 4 definidas en CATEGORIAS (más abajo). */
+/* -------------------- 1. CONFIGURACIÓN GLOBAL -------------------- */
+const CONFIG = {
+  currencySymbol: '₡',
+
+  // Clave de localStorage. NO la cambies entre versiones del archivo: si la
+  // cambias, la app dejará de encontrar los pagos ya guardados. Mientras el
+  // sitio se sirva desde la misma URL, los datos sobreviven a cualquier
+  // actualización de este HTML, porque localStorage no depende del contenido
+  // del archivo, solo del navegador + el origen (dominio/ruta) del sitio.
+  storageKeyPagos: 'tramites_dashboard_pagos_v1',
+
+  // A partir de cuántas horas en "En espera" se considera un cobro "vencido"
+  // y se dispara la alerta/aviso. Cámbialo aquí para ajustar el umbral.
+  alertaEsperaHoras: 24,
+
+  // Cada cuántos minutos se revisan las alertas mientras la pestaña permanece abierta.
+  intervaloRevisionMinutos: 5,
+};
+
+/* -------------------- 2. DATOS DE TRÁMITES -------------------- */
+/* Fuente única de verdad: el Dashboard Y el <select> "Servicio" del Gestor
+   de Pagos se generan a partir de este mismo array. Para agregar un trámite
+   nuevo: cópialo aquí (y, si quieres, agrega su bloque de instrucciones en
+   el HTML de la pestaña "Instrucciones"). */
 const TRAMITES = [
-  // ---- Salud ----
-  {
-    nombre: 'CCSS · Citas médicas (EDUS)',
-    descripcion: 'Agenda, consulta o cancela citas médicas en tu área de salud a través del Expediente Digital Único en Salud.',
-    categoria: 'Salud',
-    url: 'https://edus.ccss.sa.cr/eduscitasweb/',
-  },
-  {
-    nombre: 'CCSS · Oficina Virtual',
-    descripcion: 'Consulta incapacidades, descarga la orden patronal y revisa aportes a la seguridad social.',
-    categoria: 'Salud',
-    url: 'https://aissfa.ccss.sa.cr/afiliacion/',
-  },
-  {
-    nombre: 'CCSS · Portal institucional',
-    descripcion: 'Punto de entrada a todos los servicios en línea de la Caja Costarricense de Seguro Social.',
-    categoria: 'Salud',
-    url: 'https://www.ccss.sa.cr/',
-  },
+  { nombre: 'CCSS · Citas médicas (EDUS)', descripcion: 'Agenda, consulta o cancela citas médicas en tu área de salud a través del Expediente Digital Único en Salud.', categoria: 'Salud', url: 'https://edus.ccss.sa.cr/eduscitasweb/' },
+  { nombre: 'CCSS · Oficina Virtual', descripcion: 'Consulta incapacidades, descarga la orden patronal y revisa aportes a la seguridad social.', categoria: 'Salud', url: 'https://aissfa.ccss.sa.cr/afiliacion/' },
+  { nombre: 'CCSS · Portal institucional', descripcion: 'Punto de entrada a todos los servicios en línea de la Caja Costarricense de Seguro Social.', categoria: 'Salud', url: 'https://www.ccss.sa.cr/' },
 
-  // ---- Pagos ----
-  {
-    nombre: 'INS · Marchamo (Derecho de Circulación)',
-    descripcion: 'Consulta el monto por número de placa y paga el marchamo del vehículo en línea.',
-    categoria: 'Pagos',
-    url: 'https://marchamo.ins-cr.com/marchamo/Inicio.aspx',
-  },
-  {
-    nombre: 'Hacienda · TRIBU-CR',
-    descripcion: 'Declara y paga impuestos, y consulta tu situación tributaria ante el Ministerio de Hacienda.',
-    categoria: 'Pagos',
-    url: 'https://www.hacienda.go.cr/TRIBU-CR.html',
-  },
-  {
-    nombre: 'Grupo INS · Seguros en línea',
-    descripcion: 'Cotiza, compra y paga pólizas de seguros del Instituto Nacional de Seguros.',
-    categoria: 'Pagos',
-    url: 'https://www.grupoins.com/',
-  },
+  { nombre: 'INS · Marchamo (Derecho de Circulación)', descripcion: 'Consulta el monto por número de placa y paga el marchamo del vehículo en línea.', categoria: 'Pagos', url: 'https://marchamo.ins-cr.com/marchamo/Inicio.aspx' },
+  { nombre: 'Hacienda · TRIBU-CR', descripcion: 'Declara y paga impuestos, y consulta tu situación tributaria ante el Ministerio de Hacienda.', categoria: 'Pagos', url: 'https://www.hacienda.go.cr/TRIBU-CR.html' },
+  { nombre: 'Grupo INS · Seguros en línea', descripcion: 'Cotiza, compra y paga pólizas de seguros del Instituto Nacional de Seguros.', categoria: 'Pagos', url: 'https://www.grupoins.com/' },
 
-  // ---- Registro Nacional ----
-  {
-    nombre: 'RNP Digital · Consultas y certificaciones',
-    descripcion: 'Consulta bienes inmuebles, vehículos y personas jurídicas; compra certificaciones digitales.',
-    categoria: 'Registro Nacional',
-    url: 'https://www.rnpdigital.com/',
-  },
-  {
-    nombre: 'Registro Nacional · Estado de trámites',
-    descripcion: 'Da seguimiento al estado de documentos y gestiones presentadas ante el Registro Nacional.',
-    categoria: 'Registro Nacional',
-    url: 'https://www.rnpdigital.com/tramites_servicios/Gestiones%20y%20Consultas.htm',
-  },
-  {
-    nombre: 'Registro Nacional · Otros servicios en línea',
-    descripcion: 'Accede a servicios adicionales del Registro Nacional disponibles vía web.',
-    categoria: 'Registro Nacional',
-    url: 'https://www.rnpdigital.com/otros_servicios_linea.htm',
-  },
+  { nombre: 'RNP Digital · Consultas y certificaciones', descripcion: 'Consulta bienes inmuebles, vehículos y personas jurídicas; compra certificaciones digitales.', categoria: 'Registro Nacional', url: 'https://www.rnpdigital.com/' },
+  { nombre: 'Registro Nacional · Estado de trámites', descripcion: 'Da seguimiento al estado de documentos y gestiones presentadas ante el Registro Nacional.', categoria: 'Registro Nacional', url: 'https://www.rnpdigital.com/tramites_servicios/Gestiones%20y%20Consultas.htm' },
+  { nombre: 'Registro Nacional · Otros servicios en línea', descripcion: 'Accede a servicios adicionales del Registro Nacional disponibles vía web.', categoria: 'Registro Nacional', url: 'https://www.rnpdigital.com/otros_servicios_linea.htm' },
 
-  // ---- Varios ----
-  {
-    nombre: 'TSE · Servicios en línea',
-    descripcion: 'Consulta de cédula, matrimonio digital, padrón electoral y otros trámites del Registro Civil.',
-    categoria: 'Varios',
-    url: 'https://www.tse.go.cr/serviciosenlinea.html',
-  },
-  {
-    nombre: 'TSE · Estado de solicitud de cédula',
-    descripcion: 'Verifica en qué etapa se encuentra tu trámite de cédula de identidad.',
-    categoria: 'Varios',
-    url: 'https://www.consulta.tse.go.cr/webconsultasolicitud/',
-  },
-  {
-    nombre: 'Correos de Costa Rica · Rastreo de envíos',
-    descripcion: 'Rastrea el estado de un paquete o correspondencia con el número de guía.',
-    categoria: 'Varios',
-    url: 'https://correos.go.cr/rastreo/',
-  },
+  { nombre: 'TSE · Servicios en línea', descripcion: 'Consulta de cédula, matrimonio digital, padrón electoral y otros trámites del Registro Civil.', categoria: 'Varios', url: 'https://www.tse.go.cr/serviciosenlinea.html' },
+  { nombre: 'TSE · Estado de solicitud de cédula', descripcion: 'Verifica en qué etapa se encuentra tu trámite de cédula de identidad.', categoria: 'Varios', url: 'https://www.consulta.tse.go.cr/webconsultasolicitud/' },
+  { nombre: 'Correos de Costa Rica · Rastreo de envíos', descripcion: 'Rastrea el estado de un paquete o correspondencia con el número de guía.', categoria: 'Varios', url: 'https://correos.go.cr/rastreo/' },
 ];
 
-// Color distintivo por categoría: ayuda a escanear el grid de un vistazo.
 const CATEGORIAS = {
   'Salud':             { color: '#2DD4BF' },
   'Pagos':             { color: '#F5A623' },
@@ -273,7 +670,109 @@ const CATEGORIAS = {
 };
 const ORDEN_CATEGORIAS = Object.keys(CATEGORIAS);
 
-/* -------------------- 2. ESTADO Y REFERENCIAS AL DOM -------------------- */
+/* -------------------- 3. UTILIDADES COMPARTIDAS -------------------- */
+
+function normalizar(texto) {
+  return String(texto)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function escaparHtml(texto) {
+  const div = document.createElement('div');
+  div.textContent = texto;
+  return div.innerHTML;
+}
+
+function crearId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function formatearMoneda(valor) {
+  const numero = Number(valor) || 0;
+  return `${CONFIG.currencySymbol}${numero.toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatearFechaCorta(iso) {
+  return new Date(iso).toLocaleString('es-CR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+// "hace 3 h", "hace 2 d", etc. — usado en la tabla de pagos y en el banner de alertas.
+function tiempoRelativo(iso) {
+  const diffMs = Math.max(0, Date.now() - new Date(iso).getTime());
+  const minutos = Math.floor(diffMs / 60000);
+  if (minutos < 1) return 'justo ahora';
+  if (minutos < 60) return `hace ${minutos} min`;
+  const horas = Math.floor(minutos / 60);
+  if (horas < 24) return `hace ${horas} h`;
+  return `hace ${Math.floor(horas / 24)} d`;
+}
+
+function horasDesde(iso) {
+  return (Date.now() - new Date(iso).getTime()) / 3600000;
+}
+
+let toastTimeout = null;
+function mostrarToast(mensaje, tipo = 'info') {
+  const toast = document.getElementById('toast');
+  const colores = { success: 'background-color:#1F8A6B;', error: 'background-color:#C9402C;', info: 'background-color:#1E293B;' };
+  toast.setAttribute('style', colores[tipo] || colores.info);
+  toast.textContent = mensaje;
+  toast.classList.remove('hidden');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => toast.classList.add('hidden'), 2600);
+}
+
+/* -------------------- 4. NAVEGACIÓN ENTRE PESTAÑAS -------------------- */
+/* Pura: cambia display none/block de cada <section id="tab-...">, sin
+   ningún framework ni router. */
+
+const TITULOS_TAB = {
+  dashboard: {
+    eyebrow: 'Panel ciudadano · Costa Rica',
+    titulo: 'Portal de Trámites Digitales',
+    subtitulo: 'Accesos directos a los sitios oficiales para gestionar trámites de salud, pagos, Registro Nacional y otros servicios del Estado.',
+  },
+  pagos: {
+    eyebrow: 'Gestión interna',
+    titulo: 'Gestor de Pagos',
+    subtitulo: 'Registra cada cobro por trámite, dale seguimiento a su estado y no pierdas de vista lo que sigue pendiente.',
+  },
+  instrucciones: {
+    eyebrow: 'Documentación interna',
+    titulo: 'Instrucciones por servicio',
+    subtitulo: 'Guías paso a paso para cada trámite. Edítalas directamente en el HTML, dentro de #contenedor-instrucciones.',
+  },
+};
+
+function cambiarTab(nombre) {
+  ['dashboard', 'pagos', 'instrucciones'].forEach((tab) => {
+    document.getElementById(`tab-${tab}`).style.display = tab === nombre ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tab-btn').forEach((btn) => {
+    btn.classList.toggle('is-active', btn.dataset.tab === nombre);
+  });
+
+  const info = TITULOS_TAB[nombre];
+  document.getElementById('page-eyebrow').textContent = info.eyebrow;
+  document.getElementById('page-titulo').textContent = info.titulo;
+  document.getElementById('page-subtitulo').textContent = info.subtitulo;
+
+  if (nombre === 'pagos') {
+    prellenarClienteDesdeDashboard();
+    renderizarTablaPagos();
+    revisarAlertas();
+  }
+}
+
+document.querySelectorAll('.tab-btn').forEach((btn) => {
+  btn.addEventListener('click', () => cambiarTab(btn.dataset.tab));
+});
+
+/* -------------------- 5. MÓDULO DASHBOARD -------------------- */
+
 let filtroCategoria = 'Todos';
 let terminoBusqueda = '';
 
@@ -283,62 +782,15 @@ const contadorResultados = document.getElementById('contador-resultados');
 const inputBuscar = document.getElementById('input-buscar');
 const filtrosCategoria = document.getElementById('filtros-categoria');
 
-/* -------------------- 3. UTILIDADES -------------------- */
-
-// Quita acentos y pasa a minúsculas para comparar texto sin importar tildes.
-function normalizar(texto) {
-  return texto
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
-}
-
-// Evita inyectar HTML si algún dato llegara a contener caracteres especiales.
-function escaparHtml(texto) {
-  const div = document.createElement('div');
-  div.textContent = texto;
-  return div.innerHTML;
-}
-
-let toastTimeout = null;
-function mostrarToast(mensaje, tipo = 'info') {
-  const toast = document.getElementById('toast');
-  const colores = {
-    success: 'background-color:#1F8A6B;',
-    error: 'background-color:#C9402C;',
-    info: 'background-color:#1E293B;',
-  };
-  toast.setAttribute('style', colores[tipo] || colores.info);
-  toast.textContent = mensaje;
-  toast.classList.remove('hidden');
-
-  clearTimeout(toastTimeout);
-  toastTimeout = setTimeout(() => toast.classList.add('hidden'), 2600);
-}
-
-/* -------------------- 4. FILTROS DE CATEGORÍA (PILLS) -------------------- */
-
 function renderizarPills() {
   const categorias = ['Todos', ...ORDEN_CATEGORIAS];
-
   filtrosCategoria.innerHTML = categorias.map((categoria) => {
     const activo = categoria === filtroCategoria;
     const color = CATEGORIAS[categoria]?.color || '#E2E8F0';
-
-    // Pill activo: fondo sólido con su color. Pill inactivo: contorno sutil.
     const estilo = activo
       ? `background:${color}; color:#0B1B33; border-color:${color};`
       : `background:transparent; color:#CBD5E1; border-color:rgba(255,255,255,0.2);`;
-
-    return `
-      <button
-        type="button"
-        data-categoria="${escaparHtml(categoria)}"
-        class="pill text-xs font-semibold px-3.5 py-1.5 rounded-full border"
-        style="${estilo}"
-      >${escaparHtml(categoria)}</button>
-    `;
+    return `<button type="button" data-categoria="${escaparHtml(categoria)}" class="pill text-xs font-semibold px-3.5 py-1.5 rounded-full border" style="${estilo}">${escaparHtml(categoria)}</button>`;
   }).join('');
 }
 
@@ -350,11 +802,8 @@ filtrosCategoria.addEventListener('click', (evento) => {
   renderizarTarjetas();
 });
 
-/* -------------------- 5. RENDER DEL GRID DE TARJETAS -------------------- */
-
 function renderizarTarjetas() {
   const termino = normalizar(terminoBusqueda);
-
   const resultados = TRAMITES.filter((tramite) => {
     const coincideCategoria = filtroCategoria === 'Todos' || tramite.categoria === filtroCategoria;
     const coincideBusqueda = normalizar(tramite.nombre).includes(termino);
@@ -366,67 +815,47 @@ function renderizarTarjetas() {
     return `
       <article class="glass card-hover rounded-2xl p-5 flex flex-col justify-between">
         <div>
-          <span
-            class="inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-3"
-            style="background:${color}22; color:${color}; border:1px solid ${color}55;"
-          >${escaparHtml(tramite.categoria)}</span>
-
-          <h3 class="text-base font-semibold text-white mb-1.5 leading-snug">
-            ${escaparHtml(tramite.nombre)}
-          </h3>
-          <p class="text-sm text-slate-300 leading-relaxed">
-            ${escaparHtml(tramite.descripcion)}
-          </p>
+          <span class="inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-3" style="background:${color}22; color:${color}; border:1px solid ${color}55;">${escaparHtml(tramite.categoria)}</span>
+          <h3 class="text-base font-semibold text-white mb-1.5 leading-snug">${escaparHtml(tramite.nombre)}</h3>
+          <p class="text-sm text-slate-300 leading-relaxed">${escaparHtml(tramite.descripcion)}</p>
         </div>
-
-        <a
-          href="${tramite.url}"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="mt-4 inline-flex items-center justify-center gap-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 px-4 py-2.5 text-sm font-medium text-white transition-colors"
-        >
+        <a href="${tramite.url}" target="_blank" rel="noopener noreferrer" class="mt-4 inline-flex items-center justify-center gap-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 px-4 py-2.5 text-sm font-medium text-white transition-colors">
           Ir al sitio oficial
-          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H18m0 0v4.5M18 6l-7.5 7.5M6 12v6a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 18 18v-3.5" />
-          </svg>
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H18m0 0v4.5M18 6l-7.5 7.5M6 12v6a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 18 18v-3.5" /></svg>
         </a>
       </article>
     `;
   }).join('');
 
-  // Estado vacío + contador de resultados (ambos con aria-live para lectores de pantalla).
   estadoVacio.classList.toggle('hidden', resultados.length > 0);
   contadorResultados.textContent = resultados.length === TRAMITES.length
     ? `${resultados.length} trámites disponibles`
     : `${resultados.length} de ${TRAMITES.length} trámites`;
 }
 
-/* -------------------- 6. BUSCADOR EN TIEMPO REAL -------------------- */
-
 inputBuscar.addEventListener('input', (evento) => {
   terminoBusqueda = evento.target.value;
   renderizarTarjetas();
 });
 
-/* -------------------- 7. COPIAR DATOS DEL CLIENTE -------------------- */
-
 document.getElementById('btn-copiar').addEventListener('click', async () => {
   const input = document.getElementById('input-cliente');
   const valor = input.value.trim();
+  if (!valor) { mostrarToast('Escribe la cédula o el correo antes de copiar.', 'error'); input.focus(); return; }
+  await copiarAlPortapapeles(valor);
+  const panel = document.getElementById('panel-cliente');
+  panel.classList.add('flash-success');
+  setTimeout(() => panel.classList.remove('flash-success'), 650);
+  mostrarToast('Dato copiado ✓', 'success');
+});
 
-  if (!valor) {
-    mostrarToast('Escribe la cédula o el correo antes de copiar.', 'error');
-    input.focus();
-    return;
-  }
-
+// Compartida entre "Copiar" del Dashboard y cualquier otro botón que la necesite.
+async function copiarAlPortapapeles(texto) {
   try {
-    // API moderna de portapapeles (requiere HTTPS, disponible en GitHub Pages).
-    await navigator.clipboard.writeText(valor);
+    await navigator.clipboard.writeText(texto);
   } catch (error) {
-    // Alternativa para navegadores antiguos o contextos sin permisos de portapapeles.
     const areaTemporal = document.createElement('textarea');
-    areaTemporal.value = valor;
+    areaTemporal.value = texto;
     areaTemporal.style.position = 'fixed';
     areaTemporal.style.opacity = '0';
     document.body.appendChild(areaTemporal);
@@ -434,17 +863,452 @@ document.getElementById('btn-copiar').addEventListener('click', async () => {
     document.execCommand('copy');
     document.body.removeChild(areaTemporal);
   }
+}
 
-  const panel = document.getElementById('panel-cliente');
-  panel.classList.add('flash-success');
-  setTimeout(() => panel.classList.remove('flash-success'), 650);
-  mostrarToast('Dato copiado ✓', 'success');
+/* -------------------- 6. MÓDULO GESTOR DE PAGOS -------------------- */
+
+let pagos = [];                                 // { id, servicio, cliente, monto, estado, fechaCreacion, fechaEstado, notificado }
+let filtroDia = { tipo: 'todos', valor: null };  // tipo: 'todos' | 'hoy' | 'ayer' | 'semana' | 'mes' | 'fecha'
+let filtroEstadoPago = 'todos';
+
+/* ---- Persistencia ---- */
+function cargarPagos() {
+  try {
+    const crudo = localStorage.getItem(CONFIG.storageKeyPagos);
+    pagos = crudo ? JSON.parse(crudo) : [];
+  } catch (error) {
+    // Si el JSON estuviera corrupto, seguimos en memoria con un arreglo vacío
+    // PERO no sobrescribimos localStorage aquí: así el dato crudo original
+    // queda intacto por si se puede recuperar manualmente más adelante.
+    console.error('No se pudieron leer los pagos guardados:', error);
+    pagos = [];
+  }
+}
+
+function guardarPagos() {
+  localStorage.setItem(CONFIG.storageKeyPagos, JSON.stringify(pagos));
+}
+
+/* ---- Formulario: poblar <select> de servicios desde TRAMITES ---- */
+const selectServicio = document.getElementById('pago-servicio');
+const otroWrap = document.getElementById('pago-servicio-otro-wrap');
+const inputOtro = document.getElementById('pago-servicio-otro');
+
+function poblarSelectServicio() {
+  const nombresUnicos = [...new Set(TRAMITES.map((t) => t.nombre))];
+  selectServicio.innerHTML =
+    '<option value="" disabled selected>Selecciona un servicio…</option>' +
+    nombresUnicos.map((n) => `<option value="${escaparHtml(n)}">${escaparHtml(n)}</option>`).join('') +
+    '<option value="__otro__">Otro (especificar)</option>';
+}
+
+selectServicio.addEventListener('change', (evento) => {
+  const esOtro = evento.target.value === '__otro__';
+  otroWrap.style.display = esOtro ? 'block' : 'none';
+  if (esOtro) {
+    inputOtro.setAttribute('required', 'required');
+    inputOtro.focus();
+  } else {
+    inputOtro.removeAttribute('required');
+    inputOtro.value = '';
+  }
 });
+
+// Si el cliente ya escribió su dato en el Dashboard, lo reutilizamos aquí.
+function prellenarClienteDesdeDashboard() {
+  const clienteDashboard = document.getElementById('input-cliente').value.trim();
+  const campoCliente = document.getElementById('pago-cliente');
+  if (clienteDashboard && !campoCliente.value.trim()) {
+    campoCliente.value = clienteDashboard;
+  }
+}
+
+/* ---- Registrar transacción ---- */
+const formPago = document.getElementById('form-pago');
+const errorPago = document.getElementById('form-pago-error');
+
+formPago.addEventListener('submit', (evento) => {
+  evento.preventDefault();
+  errorPago.textContent = '';
+
+  let servicio = selectServicio.value;
+  if (servicio === '__otro__') servicio = inputOtro.value.trim();
+
+  const cliente = document.getElementById('pago-cliente').value.trim();
+  const monto = Number(document.getElementById('pago-monto').value);
+  const estado = document.getElementById('pago-estado').value;
+
+  if (!servicio) { errorPago.textContent = 'Selecciona un servicio o escribe uno en "Otro".'; return; }
+  if (!cliente) { errorPago.textContent = 'Escribe el nombre del cliente.'; return; }
+  if (!Number.isFinite(monto) || monto <= 0) { errorPago.textContent = 'El monto debe ser un número mayor a 0.'; return; }
+
+  const ahora = new Date().toISOString();
+  pagos.unshift({
+    id: crearId(),
+    servicio,
+    cliente,
+    monto,
+    estado,
+    fechaCreacion: ahora,
+    fechaEstado: ahora,   // se actualizará cada vez que el estado cambie
+    notificado: false,
+  });
+
+  guardarPagos();
+
+  // Pedimos permiso de notificaciones del navegador justo en este gesto del
+  // usuario (varios navegadores exigen que la solicitud venga de una acción
+  // directa, como este clic en "Guardar").
+  solicitarPermisoNotificaciones();
+
+  formPago.reset();
+  document.getElementById('pago-estado').value = 'En espera';
+  otroWrap.style.display = 'none';
+  inputOtro.removeAttribute('required');
+
+  mostrarToast(`Transacción registrada: ${cliente} — ${servicio}.`, 'success');
+  renderizarTablaPagos();
+  revisarAlertas();
+});
+
+/* ---- Cambiar estado / eliminar fila (delegación de eventos) ---- */
+const tablaPagosBody = document.getElementById('tabla-pagos-body');
+
+tablaPagosBody.addEventListener('change', (evento) => {
+  const select = evento.target.closest('select[data-id]');
+  if (!select) return;
+  const pago = pagos.find((p) => p.id === select.dataset.id);
+  if (!pago) return;
+
+  if (pago.estado !== select.value) {
+    pago.estado = select.value;
+    pago.fechaEstado = new Date().toISOString(); // reinicia el "reloj" de antigüedad del estado
+    pago.notificado = false;                     // permite volver a avisar si cae en espera otra vez
+    guardarPagos();
+    renderizarTablaPagos();
+    revisarAlertas();
+  }
+});
+
+tablaPagosBody.addEventListener('click', (evento) => {
+  const btnEliminar = evento.target.closest('button[data-eliminar]');
+  if (btnEliminar) {
+    const pago = pagos.find((p) => p.id === btnEliminar.dataset.eliminar);
+    if (pago && confirm(`¿Eliminar el pago de "${pago.cliente}" (${pago.servicio})? Esta acción no se puede deshacer.`)) {
+      pagos = pagos.filter((p) => p.id !== pago.id);
+      guardarPagos();
+      renderizarTablaPagos();
+      revisarAlertas();
+    }
+    return;
+  }
+
+  const btnInstrucciones = evento.target.closest('button[data-instrucciones]');
+  if (btnInstrucciones) {
+    irAInstruccionesDe(btnInstrucciones.dataset.instrucciones);
+  }
+});
+
+/* ---- Filtros: por día y por estado ---- */
+const FILTROS_DIA_DISPONIBLES = [
+  { tipo: 'todos', etiqueta: 'Todos' },
+  { tipo: 'hoy', etiqueta: 'Hoy' },
+  { tipo: 'ayer', etiqueta: 'Ayer' },
+  { tipo: 'semana', etiqueta: 'Esta semana' },
+  { tipo: 'mes', etiqueta: 'Este mes' },
+];
+
+const contenedorFiltrosDia = document.getElementById('filtros-dia');
+const inputFechaExacta = document.getElementById('filtro-fecha');
+const selectFiltroEstadoPago = document.getElementById('filtro-estado-pago');
+
+function renderizarFiltrosDia() {
+  contenedorFiltrosDia.innerHTML = FILTROS_DIA_DISPONIBLES.map(({ tipo, etiqueta }) => {
+    const activo = filtroDia.tipo === tipo;
+    const estilo = activo
+      ? 'background:var(--accent); color:#fff; border-color:var(--accent);'
+      : 'background:transparent; color:#CBD5E1; border-color:rgba(255,255,255,0.2);';
+    return `<button type="button" data-dia="${tipo}" class="pill text-xs font-semibold px-3 py-1.5 rounded-full border" style="${estilo}">${etiqueta}</button>`;
+  }).join('');
+}
+
+contenedorFiltrosDia.addEventListener('click', (evento) => {
+  const boton = evento.target.closest('button[data-dia]');
+  if (!boton) return;
+  filtroDia = { tipo: boton.dataset.dia, valor: null };
+  inputFechaExacta.value = '';
+  renderizarFiltrosDia();
+  renderizarTablaPagos();
+});
+
+inputFechaExacta.addEventListener('change', (evento) => {
+  if (!evento.target.value) return;
+  filtroDia = { tipo: 'fecha', valor: evento.target.value };
+  renderizarFiltrosDia();
+  renderizarTablaPagos();
+});
+
+selectFiltroEstadoPago.addEventListener('change', (evento) => {
+  filtroEstadoPago = evento.target.value;
+  renderizarTablaPagos();
+});
+
+function esMismoDia(fechaA, fechaB) {
+  return fechaA.getFullYear() === fechaB.getFullYear()
+    && fechaA.getMonth() === fechaB.getMonth()
+    && fechaA.getDate() === fechaB.getDate();
+}
+
+function pagoCoincideFiltroDia(pago) {
+  const fechaPago = new Date(pago.fechaCreacion);
+  const hoy = new Date();
+
+  switch (filtroDia.tipo) {
+    case 'todos':
+      return true;
+    case 'hoy':
+      return esMismoDia(fechaPago, hoy);
+    case 'ayer': {
+      const ayer = new Date(hoy);
+      ayer.setDate(hoy.getDate() - 1);
+      return esMismoDia(fechaPago, ayer);
+    }
+    case 'semana': {
+      const inicioSemana = new Date(hoy);
+      const diaSemana = (hoy.getDay() + 6) % 7; // lunes = 0
+      inicioSemana.setDate(hoy.getDate() - diaSemana);
+      inicioSemana.setHours(0, 0, 0, 0);
+      return fechaPago >= inicioSemana;
+    }
+    case 'mes':
+      return fechaPago.getFullYear() === hoy.getFullYear() && fechaPago.getMonth() === hoy.getMonth();
+    case 'fecha': {
+      const [anio, mes, dia] = filtroDia.valor.split('-').map(Number);
+      return fechaPago.getFullYear() === anio && fechaPago.getMonth() === mes - 1 && fechaPago.getDate() === dia;
+    }
+    default:
+      return true;
+  }
+}
+
+/* ---- Render de tabla + resumen ---- */
+const resumenPagos = document.getElementById('resumen-pagos');
+const pagosEmpty = document.getElementById('pagos-empty');
+
+function pagosFiltrados() {
+  return pagos
+    .filter((p) => pagoCoincideFiltroDia(p))
+    .filter((p) => filtroEstadoPago === 'todos' || p.estado === filtroEstadoPago)
+    .sort((a, b) => new Date(b.fechaCreacion) - new Date(a.fechaCreacion));
+}
+
+function renderizarTablaPagos() {
+  const filtrados = pagosFiltrados();
+
+  tablaPagosBody.innerHTML = filtrados.map((pago) => {
+    const horas = horasDesde(pago.fechaEstado);
+    const vencido = pago.estado === 'En espera' && horas >= CONFIG.alertaEsperaHoras;
+    const filaClase = vencido ? 'fila-vencida' : (pago.estado === 'En espera' ? 'fila-espera' : '');
+
+    let etiquetaEstado;
+    if (pago.estado === 'Pagado') {
+      etiquetaEstado = `<span class="estado-pagado inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full">✔ Pagado</span>`;
+    } else if (vencido) {
+      etiquetaEstado = `<span class="estado-vencido inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full">🔴 Vencido · ${tiempoRelativo(pago.fechaEstado)}</span>`;
+    } else {
+      etiquetaEstado = `<span class="estado-espera inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full">⏳ En espera · ${tiempoRelativo(pago.fechaEstado)}</span>`;
+    }
+
+    // Solo mostramos el botón "Instrucciones" si el servicio existe en TRAMITES
+    // (si el pago se registró con "Otro", no hay instrucciones que abrir).
+    const tieneInstrucciones = TRAMITES.some((t) => t.nombre === pago.servicio);
+
+    return `
+      <tr class="border-b border-white/5 ${filaClase}">
+        <td class="px-4 py-3 text-slate-300 whitespace-nowrap">${formatearFechaCorta(pago.fechaCreacion)}</td>
+        <td class="px-4 py-3 text-white">
+          ${escaparHtml(pago.servicio)}
+          ${tieneInstrucciones ? `<button type="button" data-instrucciones="${escaparHtml(pago.servicio)}" class="block text-[11px] text-[var(--accent-2)] hover:underline mt-0.5">Ver instrucciones</button>` : ''}
+        </td>
+        <td class="px-4 py-3 text-slate-300">${escaparHtml(pago.cliente)}</td>
+        <td class="px-4 py-3 text-right font-mono text-white">${formatearMoneda(pago.monto)}</td>
+        <td class="px-4 py-3">
+          <div class="flex flex-col gap-1.5">
+            ${etiquetaEstado}
+            <select data-id="${pago.id}" class="campo-glass text-xs py-1">
+              <option value="En espera" ${pago.estado === 'En espera' ? 'selected' : ''}>En espera</option>
+              <option value="Pagado" ${pago.estado === 'Pagado' ? 'selected' : ''}>Pagado</option>
+            </select>
+          </div>
+        </td>
+        <td class="px-4 py-3 text-right">
+          <button type="button" data-eliminar="${pago.id}" class="text-slate-400 hover:text-red-300 transition-colors" title="Eliminar">🗑</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  pagosEmpty.classList.toggle('hidden', filtrados.length > 0);
+
+  const totalPagado = filtrados.filter((p) => p.estado === 'Pagado').reduce((s, p) => s + p.monto, 0);
+  const totalPendiente = filtrados.filter((p) => p.estado === 'En espera').reduce((s, p) => s + p.monto, 0);
+
+  resumenPagos.innerHTML = `
+    <div class="glass rounded-2xl p-4">
+      <p class="text-[11px] uppercase tracking-wider text-slate-400 mb-1">Cobrado (filtro actual)</p>
+      <p class="text-xl font-bold text-emerald-400 font-mono">${formatearMoneda(totalPagado)}</p>
+    </div>
+    <div class="glass rounded-2xl p-4">
+      <p class="text-[11px] uppercase tracking-wider text-slate-400 mb-1">Pendiente (filtro actual)</p>
+      <p class="text-xl font-bold text-amber-400 font-mono">${formatearMoneda(totalPendiente)}</p>
+    </div>
+    <div class="glass rounded-2xl p-4">
+      <p class="text-[11px] uppercase tracking-wider text-slate-400 mb-1">Transacciones</p>
+      <p class="text-xl font-bold text-white font-mono">${filtrados.length}</p>
+    </div>
+  `;
+}
+
+/* ---- Alertas de cobros pendientes desde hace mucho tiempo ---- */
+const panelAlertas = document.getElementById('alertas-pagos');
+
+function revisarAlertas() {
+  const vencidos = pagos.filter((p) => p.estado === 'En espera' && horasDesde(p.fechaEstado) >= CONFIG.alertaEsperaHoras);
+
+  if (vencidos.length === 0) {
+    panelAlertas.classList.add('hidden');
+    panelAlertas.innerHTML = '';
+  } else {
+    const listado = vencidos
+      .slice(0, 5)
+      .map((p) => `${escaparHtml(p.cliente)} — ${escaparHtml(p.servicio)} (${tiempoRelativo(p.fechaEstado)})`)
+      .join(' · ');
+    const extra = vencidos.length > 5 ? ` y ${vencidos.length - 5} más…` : '';
+
+    panelAlertas.classList.remove('hidden');
+    panelAlertas.innerHTML = `
+      <p class="font-semibold mb-1">⚠ ${vencidos.length} cobro${vencidos.length === 1 ? '' : 's'} pendiente${vencidos.length === 1 ? '' : 's'} desde hace más de ${CONFIG.alertaEsperaHoras}h</p>
+      <p class="text-red-200/90">${listado}${extra}</p>
+    `;
+  }
+
+  // Notificaciones del navegador (solo mientras esta pestaña está abierta;
+  // este archivo no tiene service worker, así que no llegan con la pestaña cerrada).
+  let huboNuevas = false;
+  vencidos.forEach((pago) => {
+    if (!pago.notificado) {
+      dispararNotificacion(pago);
+      pago.notificado = true;
+      huboNuevas = true;
+    }
+  });
+  if (huboNuevas) guardarPagos();
+}
+
+function solicitarPermisoNotificaciones() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    Notification.requestPermission().catch(() => { /* el usuario puede ignorar el permiso sin romper la app */ });
+  }
+}
+
+function dispararNotificacion(pago) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  try {
+    new Notification('Cobro pendiente', {
+      body: `${pago.cliente} — ${pago.servicio} lleva más de ${CONFIG.alertaEsperaHoras}h en "En espera".`,
+    });
+  } catch (error) {
+    console.warn('No se pudo mostrar la notificación del navegador:', error);
+  }
+}
+
+/* ---- Respaldo: exportar / importar JSON ---- */
+document.getElementById('btn-exportar-pagos').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(pagos, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const enlace = document.createElement('a');
+  const fecha = new Date().toISOString().slice(0, 10);
+  enlace.href = url;
+  enlace.download = `pagos-tramites-${fecha}.json`;
+  document.body.appendChild(enlace);
+  enlace.click();
+  document.body.removeChild(enlace);
+  URL.revokeObjectURL(url);
+  mostrarToast('Respaldo descargado ✓', 'success');
+});
+
+const inputRestaurar = document.getElementById('input-restaurar-pagos');
+document.getElementById('btn-importar-pagos').addEventListener('click', () => inputRestaurar.click());
+
+inputRestaurar.addEventListener('change', (evento) => {
+  const archivo = evento.target.files[0];
+  if (!archivo) return;
+
+  const lector = new FileReader();
+  lector.onload = () => {
+    try {
+      const datos = JSON.parse(lector.result);
+      if (!Array.isArray(datos)) throw new Error('El archivo no contiene una lista de pagos.');
+      const confirmado = confirm(`Se encontraron ${datos.length} pagos en el archivo. Esto reemplazará los datos actuales. ¿Continuar?`);
+      if (!confirmado) return;
+      pagos = datos;
+      guardarPagos();
+      renderizarTablaPagos();
+      revisarAlertas();
+      mostrarToast('Respaldo restaurado ✓', 'success');
+    } catch (error) {
+      mostrarToast('El archivo no es un respaldo válido.', 'error');
+      console.error(error);
+    }
+  };
+  lector.readAsText(archivo);
+  evento.target.value = ''; // permite volver a elegir el mismo archivo si hace falta
+});
+
+/* -------------------- 7. MÓDULO INSTRUCCIONES -------------------- */
+
+const buscarInstrucciones = document.getElementById('buscar-instrucciones');
+const bloquesInstrucciones = Array.from(document.querySelectorAll('.instruccion-servicio'));
+const instruccionesVacio = document.getElementById('instrucciones-vacio');
+
+function filtrarInstrucciones() {
+  const termino = normalizar(buscarInstrucciones.value);
+  let visibles = 0;
+
+  bloquesInstrucciones.forEach((bloque) => {
+    const coincide = normalizar(bloque.dataset.nombre).includes(termino);
+    bloque.style.display = coincide ? 'block' : 'none';
+    if (coincide) visibles += 1;
+  });
+
+  instruccionesVacio.classList.toggle('hidden', visibles > 0);
+}
+
+buscarInstrucciones.addEventListener('input', filtrarInstrucciones);
+
+// Puente desde la tabla de pagos: abre la pestaña de Instrucciones y filtra
+// directamente por el servicio de esa fila.
+function irAInstruccionesDe(servicio) {
+  cambiarTab('instrucciones');
+  buscarInstrucciones.value = servicio;
+  filtrarInstrucciones();
+  document.getElementById('tab-instrucciones').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 
 /* -------------------- 8. INICIALIZACIÓN -------------------- */
 
 renderizarPills();
 renderizarTarjetas();
+
+poblarSelectServicio();
+cargarPagos();
+renderizarFiltrosDia();
+renderizarTablaPagos();
+revisarAlertas();
+setInterval(revisarAlertas, CONFIG.intervaloRevisionMinutos * 60 * 1000);
+
+cambiarTab('dashboard');
 </script>
 
 </body>
