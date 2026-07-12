@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Portal de Trámites Digitales · Costa Rica</title>
+<meta name="description" content="Accesos directos a los sitios oficiales para gestionar trámites de salud, pagos, Registro Nacional y otros servicios del Estado costarricense." />
+
+<!-- Tailwind CSS vía CDN (requerido: sin build step, listo para GitHub Pages) -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+  /* ==========================================================================
+     ESTILOS COMPLEMENTARIOS A TAILWIND
+     Tailwind cubre casi todo el layout/espaciado/tipografía. Aquí solo van:
+     el fondo con gradiente, el efecto "glass" (glassmorphism) y pequeñas
+     animaciones que no existen como utilidades nativas de Tailwind CDN.
+     ========================================================================== */
+  :root {
+    --accent: #E8503A;       /* coral — color de acción principal */
+    --accent-dark: #C9402C;
+    --accent-2: #34D1BF;     /* turquesa — foco / hover secundario */
+  }
+
+  body {
+    /* Fondo degradado tipo "corporate dashboard" en vez de un color plano */
+    background: linear-gradient(160deg, #0B1B33 0%, #123A5E 55%, #0E2E4E 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  /* Tarjeta de vidrio esmerilado (glassmorphism) */
+  .glass {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+  .glass-strong {
+    background: rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  .card-hover {
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-3px);
+    border-color: rgba(255, 255, 255, 0.28);
+    box-shadow: 0 16px 34px -14px rgba(0, 0, 0, 0.55);
+  }
+
+  .pill {
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+
+  /* Barra de scroll discreta, coherente con el tema oscuro */
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 999px; }
+
+  /* Pequeño destello al copiar el dato del cliente */
+  .flash-success {
+    animation: flash 0.6s ease;
+  }
+  @keyframes flash {
+    0%   { box-shadow: 0 0 0 3px rgba(52, 209, 191, 0.55); }
+    100% { box-shadow: 0 0 0 0 rgba(52, 209, 191, 0); }
+  }
+
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  #toast { animation: toast-in 0.18s ease; }
+</style>
+</head>
+
+<body class="text-slate-100 font-sans antialiased">
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+
+    <!-- ===================== ENCABEZADO ===================== -->
+    <header class="mb-8">
+      <p class="text-xs font-semibold tracking-[0.2em] uppercase text-[var(--accent-2)] mb-2">
+        Panel ciudadano · Costa Rica
+      </p>
+      <h1 class="text-3xl sm:text-4xl font-bold tracking-tight text-white">
+        Portal de Trámites Digitales
+      </h1>
+      <p class="mt-2 text-slate-300 max-w-2xl text-sm sm:text-base">
+        Accesos directos a los sitios oficiales para gestionar trámites de salud, pagos,
+        Registro Nacional y otros servicios del Estado. Busca por nombre o filtra por categoría.
+      </p>
+    </header>
+
+    <!-- ===================== DATOS DEL CLIENTE + COPIAR ===================== -->
+    <section class="glass-strong rounded-2xl p-5 sm:p-6 mb-6" id="panel-cliente">
+      <label for="input-cliente" class="block text-sm font-semibold text-slate-200 mb-2">
+        Datos del Cliente (Cédula/Correo)
+      </label>
+      <div class="flex flex-col sm:flex-row gap-3">
+        <input
+          id="input-cliente"
+          type="text"
+          inputmode="text"
+          autocomplete="off"
+          placeholder="Ej: 1-2345-6789 o cliente@correo.com"
+          class="flex-1 rounded-xl bg-white/10 border border-white/20 px-4 py-3 text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-2)] focus:border-transparent"
+        />
+        <button
+          id="btn-copiar"
+          type="button"
+          class="shrink-0 rounded-xl px-5 py-3 text-sm font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-dark)] transition-colors"
+        >
+          Copiar
+        </button>
+      </div>
+      <p class="mt-2 text-xs text-slate-400">
+        Escribe aquí la cédula o el correo del cliente una sola vez y usa "Copiar" para pegarlo
+        rápido en los formularios de las páginas oficiales que abras abajo.
+      </p>
+    </section>
+
+    <!-- ===================== BUSCADOR + FILTROS DE CATEGORÍA ===================== -->
+    <section class="glass rounded-2xl p-4 sm:p-5 mb-6 flex flex-col gap-4">
+      <div class="relative">
+        <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m0 0a7.5 7.5 0 1 0-10.6 0 7.5 7.5 0 0 0 10.6 0Z" />
+        </svg>
+        <input
+          id="input-buscar"
+          type="text"
+          autocomplete="off"
+          placeholder="Buscar trámite por nombre…"
+          class="w-full rounded-xl bg-white/10 border border-white/20 pl-11 pr-4 py-3 text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-2)] focus:border-transparent"
+        />
+      </div>
+      <!-- Los "pills" de categoría se generan dinámicamente desde script.js (ver TRAMITES) -->
+      <div id="filtros-categoria" class="flex flex-wrap gap-2"></div>
+    </section>
+
+    <p id="contador-resultados" class="text-sm text-slate-400 mb-4" aria-live="polite"></p>
+
+    <!-- ===================== GRID DE TARJETAS ===================== -->
+    <section id="grid-tramites" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+      <!-- Tarjetas generadas dinámicamente por JS -->
+    </section>
+
+    <p id="estado-vacio" class="hidden text-center text-slate-400 py-16">
+      No se encontraron trámites con ese criterio. Prueba con otro término o quita el filtro de categoría.
+    </p>
+
+    <footer class="mt-12 pt-6 border-t border-white/10 text-xs text-slate-400 leading-relaxed">
+      <p>
+        ⚠ Cada botón "Ir al sitio oficial" abre la página real de la institución en una pestaña nueva.
+        Verifica siempre que la dirección (URL) corresponda al dominio oficial antes de ingresar datos
+        personales o realizar pagos. Este panel no almacena ni envía a ningún servidor los datos del cliente:
+        solo viven en tu navegador mientras tienes la página abierta.
+      </p>
+    </footer>
+  </div>
+
+  <!-- Notificación flotante (copiar, errores de búsqueda, etc.) -->
+  <div id="toast" class="hidden fixed bottom-5 right-5 z-50 rounded-xl px-4 py-3 text-sm font-medium text-white shadow-xl"></div>
+
+<script>
+/* ============================================================================
+   PORTAL DE TRÁMITES DIGITALES — LÓGICA (JavaScript ES6 puro, sin librerías)
+   Índice:
+     1. Datos de trámites (edítalos aquí para agregar/quitar tarjetas)
+     2. Estado y referencias al DOM
+     3. Utilidades (normalizar texto, toast, escapar HTML)
+     4. Filtros de categoría (pills)
+     5. Render del grid de tarjetas
+     6. Buscador en tiempo real
+     7. Copiar datos del cliente
+     8. Inicialización
+   ============================================================================ */
+
+/* -------------------- 1. DATOS DE TRÁMITES --------------------
+   Para agregar un trámite nuevo, copia un objeto y cambia sus valores.
+   "categoria" debe ser una de las 4 definidas en CATEGORIAS (más abajo). */
+const TRAMITES = [
+  // ---- Salud ----
+  {
+    nombre: 'CCSS · Citas médicas (EDUS)',
+    descripcion: 'Agenda, consulta o cancela citas médicas en tu área de salud a través del Expediente Digital Único en Salud.',
+    categoria: 'Salud',
+    url: 'https://edus.ccss.sa.cr/eduscitasweb/',
+  },
+  {
+    nombre: 'CCSS · Oficina Virtual',
+    descripcion: 'Consulta incapacidades, descarga la orden patronal y revisa aportes a la seguridad social.',
+    categoria: 'Salud',
+    url: 'https://aissfa.ccss.sa.cr/afiliacion/',
+  },
+  {
+    nombre: 'CCSS · Portal institucional',
+    descripcion: 'Punto de entrada a todos los servicios en línea de la Caja Costarricense de Seguro Social.',
+    categoria: 'Salud',
+    url: 'https://www.ccss.sa.cr/',
+  },
+
+  // ---- Pagos ----
+  {
+    nombre: 'INS · Marchamo (Derecho de Circulación)',
+    descripcion: 'Consulta el monto por número de placa y paga el marchamo del vehículo en línea.',
+    categoria: 'Pagos',
+    url: 'https://marchamo.ins-cr.com/marchamo/Inicio.aspx',
+  },
+  {
+    nombre: 'Hacienda · TRIBU-CR',
+    descripcion: 'Declara y paga impuestos, y consulta tu situación tributaria ante el Ministerio de Hacienda.',
+    categoria: 'Pagos',
+    url: 'https://www.hacienda.go.cr/TRIBU-CR.html',
+  },
+  {
+    nombre: 'Grupo INS · Seguros en línea',
+    descripcion: 'Cotiza, compra y paga pólizas de seguros del Instituto Nacional de Seguros.',
+    categoria: 'Pagos',
+    url: 'https://www.grupoins.com/',
+  },
+
+  // ---- Registro Nacional ----
+  {
+    nombre: 'RNP Digital · Consultas y certificaciones',
+    descripcion: 'Consulta bienes inmuebles, vehículos y personas jurídicas; compra certificaciones digitales.',
+    categoria: 'Registro Nacional',
+    url: 'https://www.rnpdigital.com/',
+  },
+  {
+    nombre: 'Registro Nacional · Estado de trámites',
+    descripcion: 'Da seguimiento al estado de documentos y gestiones presentadas ante el Registro Nacional.',
+    categoria: 'Registro Nacional',
+    url: 'https://www.rnpdigital.com/tramites_servicios/Gestiones%20y%20Consultas.htm',
+  },
+  {
+    nombre: 'Registro Nacional · Otros servicios en línea',
+    descripcion: 'Accede a servicios adicionales del Registro Nacional disponibles vía web.',
+    categoria: 'Registro Nacional',
+    url: 'https://www.rnpdigital.com/otros_servicios_linea.htm',
+  },
+
+  // ---- Varios ----
+  {
+    nombre: 'TSE · Servicios en línea',
+    descripcion: 'Consulta de cédula, matrimonio digital, padrón electoral y otros trámites del Registro Civil.',
+    categoria: 'Varios',
+    url: 'https://www.tse.go.cr/serviciosenlinea.html',
+  },
+  {
+    nombre: 'TSE · Estado de solicitud de cédula',
+    descripcion: 'Verifica en qué etapa se encuentra tu trámite de cédula de identidad.',
+    categoria: 'Varios',
+    url: 'https://www.consulta.tse.go.cr/webconsultasolicitud/',
+  },
+  {
+    nombre: 'Correos de Costa Rica · Rastreo de envíos',
+    descripcion: 'Rastrea el estado de un paquete o correspondencia con el número de guía.',
+    categoria: 'Varios',
+    url: 'https://correos.go.cr/rastreo/',
+  },
+];
+
+// Color distintivo por categoría: ayuda a escanear el grid de un vistazo.
+const CATEGORIAS = {
+  'Salud':             { color: '#2DD4BF' },
+  'Pagos':             { color: '#F5A623' },
+  'Registro Nacional': { color: '#8B7CF6' },
+  'Varios':            { color: '#FB7185' },
+};
+const ORDEN_CATEGORIAS = Object.keys(CATEGORIAS);
+
+/* -------------------- 2. ESTADO Y REFERENCIAS AL DOM -------------------- */
+let filtroCategoria = 'Todos';
+let terminoBusqueda = '';
+
+const gridTramites = document.getElementById('grid-tramites');
+const estadoVacio = document.getElementById('estado-vacio');
+const contadorResultados = document.getElementById('contador-resultados');
+const inputBuscar = document.getElementById('input-buscar');
+const filtrosCategoria = document.getElementById('filtros-categoria');
+
+/* -------------------- 3. UTILIDADES -------------------- */
+
+// Quita acentos y pasa a minúsculas para comparar texto sin importar tildes.
+function normalizar(texto) {
+  return texto
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+// Evita inyectar HTML si algún dato llegara a contener caracteres especiales.
+function escaparHtml(texto) {
+  const div = document.createElement('div');
+  div.textContent = texto;
+  return div.innerHTML;
+}
+
+let toastTimeout = null;
+function mostrarToast(mensaje, tipo = 'info') {
+  const toast = document.getElementById('toast');
+  const colores = {
+    success: 'background-color:#1F8A6B;',
+    error: 'background-color:#C9402C;',
+    info: 'background-color:#1E293B;',
+  };
+  toast.setAttribute('style', colores[tipo] || colores.info);
+  toast.textContent = mensaje;
+  toast.classList.remove('hidden');
+
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => toast.classList.add('hidden'), 2600);
+}
+
+/* -------------------- 4. FILTROS DE CATEGORÍA (PILLS) -------------------- */
+
+function renderizarPills() {
+  const categorias = ['Todos', ...ORDEN_CATEGORIAS];
+
+  filtrosCategoria.innerHTML = categorias.map((categoria) => {
+    const activo = categoria === filtroCategoria;
+    const color = CATEGORIAS[categoria]?.color || '#E2E8F0';
+
+    // Pill activo: fondo sólido con su color. Pill inactivo: contorno sutil.
+    const estilo = activo
+      ? `background:${color}; color:#0B1B33; border-color:${color};`
+      : `background:transparent; color:#CBD5E1; border-color:rgba(255,255,255,0.2);`;
+
+    return `
+      <button
+        type="button"
+        data-categoria="${escaparHtml(categoria)}"
+        class="pill text-xs font-semibold px-3.5 py-1.5 rounded-full border"
+        style="${estilo}"
+      >${escaparHtml(categoria)}</button>
+    `;
+  }).join('');
+}
+
+filtrosCategoria.addEventListener('click', (evento) => {
+  const boton = evento.target.closest('button[data-categoria]');
+  if (!boton) return;
+  filtroCategoria = boton.dataset.categoria;
+  renderizarPills();
+  renderizarTarjetas();
+});
+
+/* -------------------- 5. RENDER DEL GRID DE TARJETAS -------------------- */
+
+function renderizarTarjetas() {
+  const termino = normalizar(terminoBusqueda);
+
+  const resultados = TRAMITES.filter((tramite) => {
+    const coincideCategoria = filtroCategoria === 'Todos' || tramite.categoria === filtroCategoria;
+    const coincideBusqueda = normalizar(tramite.nombre).includes(termino);
+    return coincideCategoria && coincideBusqueda;
+  });
+
+  gridTramites.innerHTML = resultados.map((tramite) => {
+    const color = CATEGORIAS[tramite.categoria]?.color || '#E2E8F0';
+    return `
+      <article class="glass card-hover rounded-2xl p-5 flex flex-col justify-between">
+        <div>
+          <span
+            class="inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-3"
+            style="background:${color}22; color:${color}; border:1px solid ${color}55;"
+          >${escaparHtml(tramite.categoria)}</span>
+
+          <h3 class="text-base font-semibold text-white mb-1.5 leading-snug">
+            ${escaparHtml(tramite.nombre)}
+          </h3>
+          <p class="text-sm text-slate-300 leading-relaxed">
+            ${escaparHtml(tramite.descripcion)}
+          </p>
+        </div>
+
+        <a
+          href="${tramite.url}"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="mt-4 inline-flex items-center justify-center gap-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 px-4 py-2.5 text-sm font-medium text-white transition-colors"
+        >
+          Ir al sitio oficial
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H18m0 0v4.5M18 6l-7.5 7.5M6 12v6a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 18 18v-3.5" />
+          </svg>
+        </a>
+      </article>
+    `;
+  }).join('');
+
+  // Estado vacío + contador de resultados (ambos con aria-live para lectores de pantalla).
+  estadoVacio.classList.toggle('hidden', resultados.length > 0);
+  contadorResultados.textContent = resultados.length === TRAMITES.length
+    ? `${resultados.length} trámites disponibles`
+    : `${resultados.length} de ${TRAMITES.length} trámites`;
+}
+
+/* -------------------- 6. BUSCADOR EN TIEMPO REAL -------------------- */
+
+inputBuscar.addEventListener('input', (evento) => {
+  terminoBusqueda = evento.target.value;
+  renderizarTarjetas();
+});
+
+/* -------------------- 7. COPIAR DATOS DEL CLIENTE -------------------- */
+
+document.getElementById('btn-copiar').addEventListener('click', async () => {
+  const input = document.getElementById('input-cliente');
+  const valor = input.value.trim();
+
+  if (!valor) {
+    mostrarToast('Escribe la cédula o el correo antes de copiar.', 'error');
+    input.focus();
+    return;
+  }
+
+  try {
+    // API moderna de portapapeles (requiere HTTPS, disponible en GitHub Pages).
+    await navigator.clipboard.writeText(valor);
+  } catch (error) {
+    // Alternativa para navegadores antiguos o contextos sin permisos de portapapeles.
+    const areaTemporal = document.createElement('textarea');
+    areaTemporal.value = valor;
+    areaTemporal.style.position = 'fixed';
+    areaTemporal.style.opacity = '0';
+    document.body.appendChild(areaTemporal);
+    areaTemporal.select();
+    document.execCommand('copy');
+    document.body.removeChild(areaTemporal);
+  }
+
+  const panel = document.getElementById('panel-cliente');
+  panel.classList.add('flash-success');
+  setTimeout(() => panel.classList.remove('flash-success'), 650);
+  mostrarToast('Dato copiado ✓', 'success');
+});
+
+/* -------------------- 8. INICIALIZACIÓN -------------------- */
+
+renderizarPills();
+renderizarTarjetas();
+</script>
+
+</body>
+</html>
