@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mi panel | PagoFácil</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body class="client-portal">
+  <header class="client-top">
+    <div class="client-top__inner">
+      <a href="index.html" class="logo" style="display:inline-flex;align-items:center;gap:.5rem;text-decoration:none;font-family:var(--display);font-weight:700;color:var(--ink)">
+        <span class="logo__mark">P</span>
+        <span>Pago<span style="color:#0d6e6e">Fácil</span></span>
+      </a>
+      <button type="button" class="btn--secondary btn--sm-admin" id="btnLogout">Salir</button>
+    </div>
+  </header>
+
+  <main class="client-content">
+    <div class="client-welcome">
+      <h1>Hola, <span id="clientName">…</span></h1>
+      <p>Aquí ves tus recibos pendientes y las citas que gestionamos por ti. Los pagos los solicitás y nosotros los realizamos de forma manual.</p>
+    </div>
+
+    <div class="filter-chips" style="margin-bottom:1rem">
+      <button type="button" class="chip is-active" data-filter="all">Todo</button>
+      <button type="button" class="chip" data-filter="facturas">Facturas</button>
+      <button type="button" class="chip" data-filter="citas">Citas</button>
+      <button type="button" class="chip" data-filter="historial">Historial pagos</button>
+    </div>
+
+    <div class="preview-card">
+      <div class="preview-card__header">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="preview-card__title" id="panelTitle">Tu panel</span>
+      </div>
+      <div class="preview-card__body" id="panelBody">
+        <p class="meta-line" style="text-align:center;padding:1rem">Cargando…</p>
+      </div>
+    </div>
+
+    <div class="client-note">
+      <strong>¿Cómo funciona el pago?</strong><br />
+      No se cobra en línea desde esta pantalla. Cuando veas un recibo pendiente, contáctanos y nosotros pagamos el servicio por ti.
+      El total incluye el monto del recibo más nuestra comisión, mostrados por separado.
+    </div>
+  </main>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <script type="module">
+    import { watchAuth, logout, requireRole } from "./js/auth-service.js";
+    import {
+      watchClientServices,
+      watchClientCitas,
+      watchPayments,
+    } from "./js/data-service.js";
+    import {
+      escapeHtml,
+      formatCRC,
+      formatDateTime,
+      cutoffStatus,
+      showToast,
+    } from "./js/utils.js";
+
+    let services = [];
+    let citas = [];
+    let payments = [];
+    let filter = "all";
+    let profile = null;
+
+    const body = document.getElementById("panelBody");
+    const title = document.getElementById("panelTitle");
+
+    document.querySelectorAll(".chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        document.querySelectorAll(".chip").forEach((c) => c.classList.remove("is-active"));
+        chip.classList.add("is-active");
+        filter = chip.dataset.filter;
+        render();
+      });
+    });
+
+    document.getElementById("btnLogout").addEventListener("click", async () => {
+      await logout();
+      location.href = "login.html";
+    });
+
+    function itemFactura(s, delay) {
+      const cut = cutoffStatus(s.diaCorte);
+      const paid = s.estado === "pagado";
+      const badge = paid
+        ? `<span class="badge badge--ok">Pagado</span>`
+        : cut.tone === "danger" || cut.tone === "warn"
+          ? `<span class="badge badge--warn">${escapeHtml(cut.label)}</span>`
+          : `<span class="badge badge--info">Pendiente</span>`;
+
+      return `<div class="preview-item" style="animation-delay:${delay}s;grid-template-columns:auto 1fr auto;${
+        paid ? "opacity:0.72" : ""
+      }">
+        <div class="preview-item__icon">${escapeHtml(s.icono || "📄")}</div>
+        <div>
+          <p class="preview-item__label">Factura · ${escapeHtml(s.nombre)}</p>
+          <p class="preview-item__value">${formatCRC(s.total)}</p>
+          <p class="preview-item__sub">Recibo ${formatCRC(s.monto)} + comisión ${formatCRC(s.comision)}${
+        s.diaCorte ? ` · Corte día ${s.diaCorte}` : ""
+      }</p>
+        </div>
+        ${badge}
+      </div>`;
+    }
+
+    function itemCita(c, delay) {
+      const fecha = [c.fecha, c.hora].filter(Boolean).join(" · ");
+      return `<div class="preview-item" style="animation-delay:${delay}s">
+        <div class="preview-item__icon">${escapeHtml(c.icono || "📅")}</div>
+        <div>
+          <p class="preview-item__label">Cita</p>
+          <p class="preview-item__value">${escapeHtml(c.titulo || "Cita")}</p>
+          <p class="preview-item__sub">${escapeHtml(fecha || "Sin fecha")} · ${escapeHtml(c.estado || "")}</p>
+          ${
+            c.archivoUrl
+              ? `<a class="tramite-card__link" style="font-size:0.8rem" href="${escapeHtml(
+                  c.archivoUrl
+                )}" target="_blank" rel="noopener">Ver archivo ↗</a>`
+              : ""
+          }
+        </div>
+        <span class="badge badge--info">${escapeHtml(c.estado || "Cita")}</span>
+      </div>`;
+    }
+
+    function itemPago(p, delay) {
+      return `<div class="preview-item" style="animation-delay:${delay}s">
+        <div class="preview-item__icon">✅</div>
+        <div>
+          <p class="preview-item__label">Pago registrado</p>
+          <p class="preview-item__value">${escapeHtml(p.servicioNombre || "Servicio")}</p>
+          <p class="preview-item__sub">${formatDateTime(p.pagadoAt)} · Recibo ${formatCRC(p.monto)} + comisión ${formatCRC(
+        p.comision
+      )}</p>
+        </div>
+        <span class="badge badge--ok">${formatCRC(p.total)}</span>
+      </div>`;
+    }
+
+    function render() {
+      const parts = [];
+      let delay = 0;
+
+      if (filter === "all" || filter === "facturas") {
+        const pending = services.filter((s) => s.estado !== "pagado");
+        const paid = services.filter((s) => s.estado === "pagado");
+        const ordered = [...pending, ...paid];
+        ordered.forEach((s) => {
+          parts.push(itemFactura(s, delay));
+          delay += 0.04;
+        });
+      }
+
+      if (filter === "all" || filter === "citas") {
+        citas.forEach((c) => {
+          parts.push(itemCita(c, delay));
+          delay += 0.04;
+        });
+      }
+
+      if (filter === "historial") {
+        payments.forEach((p) => {
+          parts.push(itemPago(p, delay));
+          delay += 0.04;
+        });
+      }
+
+      const labels = {
+        all: "Tu panel",
+        facturas: "Tus facturas",
+        citas: "Tus citas",
+        historial: "Historial de pagos",
+      };
+      title.textContent = labels[filter] || "Tu panel";
+
+      if (!parts.length) {
+        body.innerHTML = `<div style="text-align:center;padding:1.5rem;color:#64748b">
+          <strong style="display:block;color:#0f172a;margin-bottom:0.35rem">Nada por mostrar</strong>
+          Cuando el equipo agregue facturas o citas, aparecerán aquí al instante.
+        </div>`;
+        return;
+      }
+
+      body.innerHTML = parts.join("");
+    }
+
+    watchAuth((user, err) => {
+      if (!user) {
+        location.replace("login.html");
+        return;
+      }
+      // Clientes NUNCA entran al admin
+      if (user.role === "admin") {
+        location.replace("admin.html");
+        return;
+      }
+      if (!requireRole(user, ["client"])) return;
+      profile = user;
+      document.getElementById("clientName").textContent = (user.nombre || user.email || "cliente").split(
+        " "
+      )[0];
+
+      watchClientServices(user.uid, (list, e) => {
+        if (e) showToast("No se pudieron cargar facturas", "err");
+        services = list;
+        render();
+      });
+
+      watchClientCitas(user.uid, (list) => {
+        citas = list;
+        render();
+      });
+
+      watchPayments(user.uid, (list) => {
+        payments = list;
+        if (filter === "historial") render();
+      });
+    });
+  </script>
+</body>
+</html>

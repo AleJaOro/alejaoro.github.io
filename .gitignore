@@ -1,0 +1,32 @@
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Entornos y secretos (por si los agregas después)
+.env
+.env.*
+!.env.example
+*.local
+
+# Logs y dependencias (si más adelante usas npm)
+node_modules/
+npm-debug.log*
+dist/
+build/
+.cache/
+
+# Python (servidor local opcional)
+__pycache__/
+*.pyc
+
+# Archivos temporales
+*.tmp
+*.bak
+~$*

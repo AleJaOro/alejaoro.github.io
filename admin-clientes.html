@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clientes | Admin PagoFácil</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body class="admin-body">
+  <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
+  <div class="admin-shell">
+    <aside class="admin-sidebar" id="adminSidebar">
+      <a href="admin.html" class="logo"><span class="logo__mark">P</span><span class="logo__text">Pago<span>Fácil</span></span></a>
+      <nav class="admin-nav">
+        <a href="admin.html"><span>🗂️</span> Trámites</a>
+        <a href="admin-clientes.html" class="is-active"><span>👥</span> Clientes</a>
+        <a href="instrucciones.html"><span>📖</span> Instrucciones</a>
+        <a href="index.html" target="_blank" rel="noopener"><span>🌐</span> Sitio público</a>
+      </nav>
+      <div class="admin-sidebar__footer">
+        <div class="admin-user">Sesión admin<strong id="adminUserName">…</strong></div>
+        <button type="button" class="btn--sidebar" id="btnLogout">Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <div class="admin-topbar">
+        <div>
+          <button type="button" class="admin-menu-btn" id="btnMenu">☰ Menú</button>
+          <h1>Clientes</h1>
+          <p>Crea cuentas de cliente (correo + contraseña). Entra al detalle para asignar facturas, comisiones, citas y ver historial de pagos.</p>
+        </div>
+        <div class="admin-topbar__actions">
+          <span class="sync-dot" id="syncDot" hidden>En vivo</span>
+          <button type="button" class="btn btn--primary" id="btnNuevo">+ Nuevo cliente</button>
+        </div>
+      </div>
+
+      <div class="admin-stats">
+        <div class="stat-card"><span>Total</span><strong id="statTotal">0</strong></div>
+        <div class="stat-card"><span>Activos</span><strong id="statActivos">0</strong></div>
+        <div class="stat-card"><span>Inactivos</span><strong id="statInactivos">0</strong></div>
+      </div>
+
+      <div class="toolbar">
+        <input type="search" id="search" class="search-input" placeholder="Buscar por nombre, correo o teléfono…" />
+        <div class="filter-chips">
+          <button type="button" class="chip is-active" data-filter="all">Todos</button>
+          <button type="button" class="chip" data-filter="active">Activos</button>
+          <button type="button" class="chip" data-filter="inactive">Inactivos</button>
+        </div>
+      </div>
+
+      <div id="grid" class="clients-grid"></div>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="modal" aria-hidden="true">
+    <div class="modal">
+      <div class="modal__header">
+        <h2 id="modalTitle">Nuevo cliente</h2>
+        <button type="button" class="modal-close" data-close-modal>&times;</button>
+      </div>
+      <form id="form" class="form">
+        <input type="hidden" id="editId" />
+        <div class="form__group">
+          <label for="nombre">Nombre completo *</label>
+          <input id="nombre" required maxlength="120" />
+        </div>
+        <div class="form__group" id="emailGroup">
+          <label for="email">Correo (usuario de acceso) *</label>
+          <input id="email" type="email" required placeholder="cliente@correo.com" />
+          <p class="form__hint">El cliente iniciará sesión con este correo.</p>
+        </div>
+        <div class="form__group" id="passGroup">
+          <label for="password">Contraseña asignada *</label>
+          <input id="password" type="text" minlength="6" placeholder="Mínimo 6 caracteres" />
+          <p class="form__hint">Tú defines la contraseña y se la comunicas al cliente.</p>
+        </div>
+        <div class="form__group">
+          <label for="telefono">Teléfono / WhatsApp</label>
+          <input id="telefono" type="tel" placeholder="8888-8888" />
+        </div>
+        <div class="form__group">
+          <label for="notas">Notas internas</label>
+          <textarea id="notas" rows="2"></textarea>
+        </div>
+        <div class="form__group" id="activoGroup" hidden>
+          <label for="activo">Estado</label>
+          <select id="activo">
+            <option value="true">Activo</option>
+            <option value="false">Inactivo</option>
+          </select>
+        </div>
+        <div class="modal__actions">
+          <button type="button" class="btn--secondary" data-close-modal>Cancelar</button>
+          <button type="submit" class="btn btn--primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+
+  <script type="module">
+    import { watchAuth, logout, requireRole, createClientAccount } from "./js/auth-service.js";
+    import { watchClients, updateClient, deactivateClient } from "./js/data-service.js";
+    import {
+      escapeHtml,
+      showToast,
+      openModal,
+      closeModal,
+      bindModal,
+      initAdminShell,
+      debounce,
+    } from "./js/utils.js";
+
+    let clients = [];
+    let search = "";
+    let statusFilter = "all";
+
+    const grid = document.getElementById("grid");
+    const modal = document.getElementById("modal");
+    const form = document.getElementById("form");
+    bindModal(modal);
+
+    watchAuth((user) => {
+      if (!user) {
+        window.location.replace("login.html");
+        return;
+      }
+      if (!requireRole(user, ["admin"])) return;
+      initAdminShell({
+        user,
+        onLogout: async () => {
+          await logout();
+          window.location.href = "login.html";
+        },
+      });
+
+      watchClients((list, err) => {
+        document.getElementById("syncDot").hidden = false;
+        if (err) {
+          showToast("Error al cargar clientes", "err");
+          return;
+        }
+        clients = list;
+        const activos = list.filter((c) => c.activo !== false).length;
+        document.getElementById("statTotal").textContent = String(list.length);
+        document.getElementById("statActivos").textContent = String(activos);
+        document.getElementById("statInactivos").textContent = String(list.length - activos);
+        render();
+      });
+    });
+
+    function initials(name) {
+      const p = (name || "?").trim().split(/\s+/);
+      return ((p[0]?.[0] || "") + (p[1]?.[0] || "")).toUpperCase() || "?";
+    }
+
+    function render() {
+      const q = search.trim().toLowerCase();
+      let list = clients.filter((c) => {
+        if (statusFilter === "active" && c.activo === false) return false;
+        if (statusFilter === "inactive" && c.activo !== false) return false;
+        if (!q) return true;
+        return (
+          (c.nombre || "").toLowerCase().includes(q) ||
+          (c.email || "").toLowerCase().includes(q) ||
+          (c.telefono || "").toLowerCase().includes(q)
+        );
+      });
+
+      if (!list.length) {
+        grid.innerHTML = `<div class="empty-state"><strong>No hay clientes</strong>Crea el primero con “Nuevo cliente”.</div>`;
+        return;
+      }
+
+      grid.innerHTML = list
+        .map(
+          (c, i) => `
+        <article class="client-card" style="animation-delay:${i * 0.03}s" data-id="${escapeHtml(c.id)}">
+          <div class="client-card__head">
+            <div class="avatar">${escapeHtml(initials(c.nombre))}</div>
+            <div style="flex:1;min-width:0">
+              <h3>${escapeHtml(c.nombre || "Sin nombre")}</h3>
+              <p class="meta-line">${escapeHtml(c.email || "")}</p>
+            </div>
+            <span class="badge ${c.activo === false ? "badge--off" : "badge--ok"}">${
+              c.activo === false ? "Inactivo" : "Activo"
+            }</span>
+          </div>
+          <p class="meta-line">📱 ${escapeHtml(c.telefono || "Sin teléfono")}</p>
+          ${c.notas ? `<p class="meta-line">${escapeHtml(c.notas)}</p>` : ""}
+          <div class="client-card__actions">
+            <a class="btn btn--primary btn--sm-admin" href="admin-cliente.html?id=${encodeURIComponent(c.id)}">Gestionar</a>
+            <button type="button" class="btn--secondary btn--sm-admin" data-act="edit">Editar</button>
+            ${
+              c.activo !== false
+                ? `<button type="button" class="btn--danger btn--sm-admin" data-act="off">Desactivar</button>`
+                : ""
+            }
+          </div>
+        </article>`
+        )
+        .join("");
+    }
+
+    document.getElementById("search").addEventListener(
+      "input",
+      debounce((e) => {
+        search = e.target.value;
+        render();
+      }, 180)
+    );
+
+    document.querySelectorAll(".chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        document.querySelectorAll(".chip").forEach((c) => c.classList.remove("is-active"));
+        chip.classList.add("is-active");
+        statusFilter = chip.dataset.filter;
+        render();
+      });
+    });
+
+    document.getElementById("btnNuevo").addEventListener("click", () => {
+      form.reset();
+      form.editId.value = "";
+      document.getElementById("modalTitle").textContent = "Nuevo cliente";
+      document.getElementById("emailGroup").hidden = false;
+      document.getElementById("passGroup").hidden = false;
+      document.getElementById("activoGroup").hidden = true;
+      form.email.required = true;
+      form.password.required = true;
+      form.email.disabled = false;
+      openModal(modal);
+    });
+
+    grid.addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-act]");
+      if (!btn) return;
+      const id = btn.closest("[data-id]")?.dataset.id;
+      const c = clients.find((x) => x.id === id);
+      if (!c) return;
+
+      if (btn.dataset.act === "edit") {
+        form.editId.value = c.id;
+        form.nombre.value = c.nombre || "";
+        form.email.value = c.email || "";
+        form.telefono.value = c.telefono || "";
+        form.notas.value = c.notas || "";
+        form.activo.value = c.activo === false ? "false" : "true";
+        document.getElementById("modalTitle").textContent = "Editar cliente";
+        document.getElementById("emailGroup").hidden = false;
+        form.email.disabled = true;
+        form.email.required = false;
+        document.getElementById("passGroup").hidden = true;
+        form.password.required = false;
+        document.getElementById("activoGroup").hidden = false;
+        openModal(modal);
+      }
+
+      if (btn.dataset.act === "off") {
+        if (!confirm(`¿Desactivar a ${c.nombre}? No podrá iniciar sesión.`)) return;
+        try {
+          await deactivateClient(id);
+          showToast("Cliente desactivado");
+        } catch (err) {
+          showToast(err.message || "Error", "err");
+        }
+      }
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const id = form.editId.value;
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Guardando…";
+      }
+      try {
+        if (id) {
+          await updateClient(id, {
+            nombre: form.nombre.value,
+            telefono: form.telefono.value,
+            notas: form.notas.value,
+            activo: form.activo.value === "true",
+          });
+          showToast("Cliente actualizado");
+          closeModal(modal);
+        } else {
+          const pass = form.password.value;
+          if (!pass || pass.length < 6) {
+            showToast("La contraseña debe tener al menos 6 caracteres", "err");
+            return;
+          }
+          const result = await createClientAccount({
+            email: form.email.value,
+            password: pass,
+            nombre: form.nombre.value,
+            telefono: form.telefono.value,
+            notas: form.notas.value,
+          });
+          const msg =
+            (result.message || "Cliente listo.") +
+            " Entrégale: " +
+            form.email.value.trim() +
+            " / contraseña asignada.";
+          showToast(msg);
+          // Aviso visible (el toast a veces se va muy rápido)
+          alert(msg);
+          closeModal(modal);
+        }
+      } catch (err) {
+        console.error(err);
+        let msg = err.message || "Error al guardar";
+        if (err.code === "auth/email-already-in-use") {
+          msg =
+            "Ese correo ya está en Authentication. Si no aparece en la lista, " +
+            "vuelve a guardar con la MISMA contraseña para reparar el perfil, " +
+            "o borra el usuario en Firebase → Authentication.";
+        }
+        if (err.code === "auth/weak-password") msg = "Contraseña demasiado débil (mín. 6 caracteres).";
+        if (err.code === "auth/invalid-email") msg = "Correo no válido.";
+        showToast(msg, "err");
+        alert("Error: " + msg);
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Guardar";
+        }
+      }
+    });
+  </script>
+</body>
+</html>

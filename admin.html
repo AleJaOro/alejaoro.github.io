@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard · Trámites | Admin PagoFácil</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body class="admin-body">
+  <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
+  <div class="admin-shell">
+    <aside class="admin-sidebar" id="adminSidebar">
+      <a href="admin.html" class="logo"><span class="logo__mark">P</span><span class="logo__text">Pago<span>Fácil</span></span></a>
+      <nav class="admin-nav">
+        <a href="admin.html" class="is-active"><span>🗂️</span> Trámites</a>
+        <a href="admin-clientes.html"><span>👥</span> Clientes</a>
+        <a href="instrucciones.html"><span>📖</span> Instrucciones</a>
+        <a href="index.html" target="_blank" rel="noopener"><span>🌐</span> Sitio público</a>
+      </nav>
+      <div class="admin-sidebar__footer">
+        <div class="admin-user">Sesión admin<strong id="adminUserName">…</strong></div>
+        <button type="button" class="btn--sidebar" id="btnLogout">Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <div class="admin-topbar">
+        <div>
+          <button type="button" class="admin-menu-btn" id="btnMenu">☰ Menú</button>
+          <h1>Catálogo de trámites</h1>
+          <p>Servicios oficiales que se vinculan a facturas y citas de cada cliente. Cambios en tiempo real para todo el equipo.</p>
+        </div>
+        <div class="admin-topbar__actions">
+          <span class="sync-dot" id="syncDot" hidden>En vivo</span>
+          <button type="button" class="btn btn--primary" id="btnNuevo">+ Nuevo trámite</button>
+        </div>
+      </div>
+
+      <div class="admin-stats">
+        <div class="stat-card"><span>Trámites</span><strong id="statTramites">0</strong></div>
+        <div class="stat-card"><span>Clientes</span><strong id="statClientes">0</strong></div>
+        <div class="stat-card"><span>Servicios activos</span><strong id="statServicios">0</strong></div>
+      </div>
+
+      <div class="toolbar">
+        <input type="search" id="searchTramite" class="search-input" placeholder="Buscar trámite por nombre…" />
+      </div>
+
+      <div id="loading" class="loading-bar" hidden></div>
+      <div id="grid" class="tramites-grid"></div>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="modal" aria-hidden="true">
+    <div class="modal">
+      <div class="modal__header">
+        <h2 id="modalTitle">Nuevo trámite</h2>
+        <button type="button" class="modal-close" data-close-modal>&times;</button>
+      </div>
+      <form id="form" class="form">
+        <input type="hidden" id="editId" />
+        <div class="form__group">
+          <label for="nombre">Nombre del servicio *</label>
+          <input id="nombre" required maxlength="120" placeholder="Ej. Electricidad ICE" />
+        </div>
+        <div class="form__group">
+          <label for="icono">Icono (emoji)</label>
+          <input id="icono" maxlength="4" placeholder="⚡" />
+        </div>
+        <div class="form__group">
+          <label for="descripcion">Descripción</label>
+          <textarea id="descripcion" rows="2" maxlength="300"></textarea>
+        </div>
+        <div class="form__group">
+          <label for="enlace">Enlace web oficial *</label>
+          <input id="enlace" type="url" required placeholder="https://…" />
+        </div>
+        <div class="modal__actions">
+          <button type="button" class="btn--secondary" data-close-modal>Cancelar</button>
+          <button type="submit" class="btn btn--primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+
+  <script type="module">
+    import { watchAuth, logout, requireRole } from "./js/auth-service.js";
+    import {
+      watchTramites,
+      addTramite,
+      updateTramite,
+      deleteTramite,
+      watchClients,
+      watchAllClientServices,
+      seedTramitesIfEmpty,
+    } from "./js/data-service.js";
+    import {
+      escapeHtml,
+      showToast,
+      openModal,
+      closeModal,
+      bindModal,
+      initAdminShell,
+      debounce,
+    } from "./js/utils.js";
+
+    let profile = null;
+    let tramites = [];
+    let filter = "";
+
+    const grid = document.getElementById("grid");
+    const modal = document.getElementById("modal");
+    const form = document.getElementById("form");
+    bindModal(modal);
+
+    watchAuth(async (user, err) => {
+      if (!user) {
+        window.location.replace("login.html");
+        return;
+      }
+      if (!requireRole(user, ["admin"])) return;
+      profile = user;
+      initAdminShell({
+        user,
+        onLogout: async () => {
+          await logout();
+          window.location.href = "login.html";
+        },
+      });
+
+      try {
+        await seedTramitesIfEmpty();
+      } catch (_) {}
+
+      document.getElementById("loading").hidden = false;
+
+      watchTramites((list, e) => {
+        document.getElementById("loading").hidden = true;
+        document.getElementById("syncDot").hidden = false;
+        if (e) {
+          showToast("Error al cargar trámites: revisa reglas Firestore", "err");
+          return;
+        }
+        tramites = list;
+        document.getElementById("statTramites").textContent = String(list.length);
+        render();
+      });
+
+      watchClients((list) => {
+        document.getElementById("statClientes").textContent = String(list.filter((c) => c.activo !== false).length);
+      });
+
+      watchAllClientServices((list) => {
+        document.getElementById("statServicios").textContent = String(
+          list.filter((s) => s.estado !== "pagado").length
+        );
+      });
+    });
+
+    function render() {
+      const q = filter.trim().toLowerCase();
+      const list = tramites.filter(
+        (t) =>
+          !q ||
+          (t.nombre || "").toLowerCase().includes(q) ||
+          (t.descripcion || "").toLowerCase().includes(q)
+      );
+
+      if (!list.length) {
+        grid.innerHTML = `<div class="empty-state"><strong>Sin resultados</strong>Agrega un trámite o ajusta la búsqueda.</div>`;
+        return;
+      }
+
+      grid.innerHTML = list
+        .map(
+          (t, i) => `
+        <article class="tramite-card" style="animation-delay:${i * 0.04}s" data-id="${escapeHtml(t.id)}">
+          <div class="tramite-card__head">
+            <div class="tramite-card__icon">${escapeHtml(t.icono || "🔗")}</div>
+            <div><h3>${escapeHtml(t.nombre)}</h3></div>
+          </div>
+          <p class="tramite-card__desc">${escapeHtml(t.descripcion || "Sin descripción")}</p>
+          <a class="tramite-card__link" href="${escapeHtml(t.enlace)}" target="_blank" rel="noopener">Abrir web oficial ↗</a>
+          <div class="tramite-card__actions">
+            <button type="button" class="btn btn--primary btn--sm-admin" data-act="edit">Editar</button>
+            <button type="button" class="btn--danger btn--sm-admin" data-act="del">Eliminar</button>
+          </div>
+        </article>`
+        )
+        .join("");
+    }
+
+    document.getElementById("searchTramite").addEventListener(
+      "input",
+      debounce((e) => {
+        filter = e.target.value;
+        render();
+      }, 180)
+    );
+
+    document.getElementById("btnNuevo").addEventListener("click", () => {
+      form.reset();
+      form.editId.value = "";
+      form.icono.value = "🔗";
+      document.getElementById("modalTitle").textContent = "Nuevo trámite";
+      openModal(modal);
+    });
+
+    grid.addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-act]");
+      if (!btn) return;
+      const id = btn.closest("[data-id]")?.dataset.id;
+      const t = tramites.find((x) => x.id === id);
+      if (!t) return;
+
+      if (btn.dataset.act === "edit") {
+        form.editId.value = t.id;
+        form.nombre.value = t.nombre || "";
+        form.icono.value = t.icono || "";
+        form.descripcion.value = t.descripcion || "";
+        form.enlace.value = t.enlace || "";
+        document.getElementById("modalTitle").textContent = "Editar trámite";
+        openModal(modal);
+      }
+
+      if (btn.dataset.act === "del") {
+        if (!confirm(`¿Eliminar el trámite "${t.nombre}"?`)) return;
+        try {
+          await deleteTramite(id);
+          showToast("Trámite eliminado");
+        } catch (err) {
+          showToast(err.message || "Error al eliminar", "err");
+        }
+      }
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const payload = {
+        nombre: form.nombre.value,
+        icono: form.icono.value,
+        descripcion: form.descripcion.value,
+        enlace: form.enlace.value,
+      };
+      try {
+        if (form.editId.value) {
+          await updateTramite(form.editId.value, payload);
+          showToast("Trámite actualizado");
+        } else {
+          await addTramite(payload);
+          showToast("Trámite creado");
+        }
+        closeModal(modal);
+      } catch (err) {
+        showToast(err.message || "Error al guardar", "err");
+      }
+    });
+  </script>
+</body>
+</html>

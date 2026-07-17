@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Instrucciones | Admin PagoFácil</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body class="admin-body">
+  <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
+  <div class="admin-shell">
+    <aside class="admin-sidebar" id="adminSidebar">
+      <a href="admin.html" class="logo"><span class="logo__mark">P</span><span class="logo__text">Pago<span>Fácil</span></span></a>
+      <nav class="admin-nav">
+        <a href="admin.html"><span>🗂️</span> Trámites</a>
+        <a href="admin-clientes.html"><span>👥</span> Clientes</a>
+        <a href="instrucciones.html" class="is-active"><span>📖</span> Instrucciones</a>
+        <a href="index.html" target="_blank" rel="noopener"><span>🌐</span> Sitio público</a>
+      </nav>
+      <div class="admin-sidebar__footer">
+        <div class="admin-user">Sesión admin<strong id="adminUserName">…</strong></div>
+        <button type="button" class="btn--sidebar" id="btnLogout">Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <div class="admin-topbar">
+        <div>
+          <button type="button" class="admin-menu-btn" id="btnMenu">☰ Menú</button>
+          <h1>Instrucciones de trámites</h1>
+          <p>Guías internas del equipo. Se guardan en Firebase y se sincronizan en tiempo real.</p>
+        </div>
+        <div class="admin-topbar__actions">
+          <span class="sync-dot" id="syncDot" hidden>En vivo</span>
+          <button type="button" class="btn btn--primary" id="btnNuevo">+ Nueva instrucción</button>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <input type="search" id="search" class="search-input" placeholder="Buscar instrucciones…" />
+      </div>
+      <div id="list" class="instrucciones-list"></div>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="modal" aria-hidden="true">
+    <div class="modal">
+      <div class="modal__header">
+        <h2 id="modalTitle">Nueva instrucción</h2>
+        <button type="button" class="modal-close" data-close-modal>&times;</button>
+      </div>
+      <form id="form" class="form">
+        <input type="hidden" id="editId" />
+        <div class="form__group">
+          <label for="titulo">Título *</label>
+          <input id="titulo" required maxlength="150" />
+        </div>
+        <div class="form__group">
+          <label for="tramiteId">Trámite relacionado</label>
+          <select id="tramiteId"><option value="">— Sin vincular —</option></select>
+        </div>
+        <div class="form__group">
+          <label for="contenido">Pasos *</label>
+          <textarea id="contenido" rows="8" required></textarea>
+        </div>
+        <div class="modal__actions">
+          <button type="button" class="btn--secondary" data-close-modal>Cancelar</button>
+          <button type="submit" class="btn btn--primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+
+  <script type="module">
+    import { watchAuth, logout, requireRole } from "./js/auth-service.js";
+    import {
+      watchInstrucciones,
+      addInstruccion,
+      updateInstruccion,
+      deleteInstruccion,
+      watchTramites,
+    } from "./js/data-service.js";
+    import {
+      escapeHtml,
+      formatDateTime,
+      showToast,
+      openModal,
+      closeModal,
+      bindModal,
+      initAdminShell,
+      debounce,
+    } from "./js/utils.js";
+
+    let instrucciones = [];
+    let tramites = [];
+    let search = "";
+
+    const listEl = document.getElementById("list");
+    const modal = document.getElementById("modal");
+    const form = document.getElementById("form");
+    bindModal(modal);
+
+    watchAuth((user) => {
+      if (!user) {
+        location.replace("login.html");
+        return;
+      }
+      if (!requireRole(user, ["admin"])) return;
+      initAdminShell({
+        user,
+        onLogout: async () => {
+          await logout();
+          location.href = "login.html";
+        },
+      });
+
+      watchTramites((t) => {
+        tramites = t;
+        form.tramiteId.innerHTML =
+          `<option value="">— Sin vincular —</option>` +
+          t.map((x) => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.nombre)}</option>`).join("");
+        render();
+      });
+
+      watchInstrucciones((list, err) => {
+        document.getElementById("syncDot").hidden = false;
+        if (err) {
+          showToast("Error al cargar instrucciones (¿índice updatedAt?)", "err");
+          return;
+        }
+        instrucciones = list;
+        render();
+      });
+    });
+
+    function render() {
+      const q = search.trim().toLowerCase();
+      const map = Object.fromEntries(tramites.map((t) => [t.id, t]));
+      const list = instrucciones.filter(
+        (i) =>
+          !q ||
+          (i.titulo || "").toLowerCase().includes(q) ||
+          (i.contenido || "").toLowerCase().includes(q)
+      );
+
+      if (!list.length) {
+        listEl.innerHTML = `<div class="empty-state"><strong>Sin instrucciones</strong>Crea la primera guía del equipo.</div>`;
+        return;
+      }
+
+      listEl.innerHTML = list
+        .map((ins) => {
+          const t = ins.tramiteId ? map[ins.tramiteId] : null;
+          const tag = t
+            ? `<span class="badge badge--ok">${escapeHtml(t.icono || "")} ${escapeHtml(t.nombre)}</span>`
+            : `<span class="badge badge--muted">General</span>`;
+          return `<article class="stack-card" style="margin-bottom:0.85rem" data-id="${escapeHtml(ins.id)}">
+            <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:0.75rem;margin-bottom:0.65rem">
+              <div>
+                <h3 style="margin:0 0 0.35rem;font-family:var(--display)">${escapeHtml(ins.titulo)}</h3>
+                <div style="display:flex;flex-wrap:wrap;gap:0.4rem;align-items:center">
+                  ${tag}
+                  <span class="meta-line">Actualizado: ${formatDateTime(ins.updatedAt)}</span>
+                </div>
+              </div>
+              ${
+                t?.enlace
+                  ? `<a class="tramite-card__link" href="${escapeHtml(t.enlace)}" target="_blank" rel="noopener">Web oficial ↗</a>`
+                  : ""
+              }
+            </div>
+            <pre style="white-space:pre-wrap;margin:0;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem;font-family:inherit;font-size:0.95rem;color:#334155">${escapeHtml(
+              ins.contenido
+            )}</pre>
+            <div class="row-actions" style="margin-top:0.85rem">
+              <button type="button" class="btn btn--primary btn--sm-admin" data-act="edit">Editar</button>
+              <button type="button" class="btn--danger btn--sm-admin" data-act="del">Eliminar</button>
+            </div>
+          </article>`;
+        })
+        .join("");
+    }
+
+    document.getElementById("search").addEventListener(
+      "input",
+      debounce((e) => {
+        search = e.target.value;
+        render();
+      }, 180)
+    );
+
+    document.getElementById("btnNuevo").addEventListener("click", () => {
+      form.reset();
+      form.editId.value = "";
+      document.getElementById("modalTitle").textContent = "Nueva instrucción";
+      openModal(modal);
+    });
+
+    listEl.addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-act]");
+      if (!btn) return;
+      const id = btn.closest("[data-id]")?.dataset.id;
+      const ins = instrucciones.find((x) => x.id === id);
+      if (!ins) return;
+
+      if (btn.dataset.act === "edit") {
+        form.editId.value = ins.id;
+        form.titulo.value = ins.titulo || "";
+        form.tramiteId.value = ins.tramiteId || "";
+        form.contenido.value = ins.contenido || "";
+        document.getElementById("modalTitle").textContent = "Editar instrucción";
+        openModal(modal);
+      }
+
+      if (btn.dataset.act === "del") {
+        if (!confirm(`¿Eliminar "${ins.titulo}"?`)) return;
+        try {
+          await deleteInstruccion(id);
+          showToast("Instrucción eliminada");
+        } catch (err) {
+          showToast(err.message || "Error", "err");
+        }
+      }
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const payload = {
+        titulo: form.titulo.value,
+        contenido: form.contenido.value,
+        tramiteId: form.tramiteId.value,
+      };
+      try {
+        if (form.editId.value) {
+          await updateInstruccion(form.editId.value, payload);
+          showToast("Instrucción actualizada");
+        } else {
+          await addInstruccion(payload);
+          showToast("Instrucción creada");
+        }
+        closeModal(modal);
+      } catch (err) {
+        showToast(err.message || "Error al guardar", "err");
+      }
+    });
+  </script>
+</body>
+</html>

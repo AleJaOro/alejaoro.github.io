@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Detalle cliente | Admin PagoFácil</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body class="admin-body">
+  <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
+  <div class="admin-shell">
+    <aside class="admin-sidebar" id="adminSidebar">
+      <a href="admin.html" class="logo"><span class="logo__mark">P</span><span class="logo__text">Pago<span>Fácil</span></span></a>
+      <nav class="admin-nav">
+        <a href="admin.html"><span>🗂️</span> Trámites</a>
+        <a href="admin-clientes.html" class="is-active"><span>👥</span> Clientes</a>
+        <a href="instrucciones.html"><span>📖</span> Instrucciones</a>
+        <a href="index.html" target="_blank" rel="noopener"><span>🌐</span> Sitio público</a>
+      </nav>
+      <div class="admin-sidebar__footer">
+        <div class="admin-user">Sesión admin<strong id="adminUserName">…</strong></div>
+        <button type="button" class="btn--sidebar" id="btnLogout">Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <div class="admin-topbar">
+        <div>
+          <button type="button" class="admin-menu-btn" id="btnMenu">☰ Menú</button>
+          <p style="margin:0.4rem 0 0"><a href="admin-clientes.html" class="btn--ghost-link">← Volver a clientes</a></p>
+          <h1 id="pageTitle">Cliente</h1>
+          <p id="pageSub">Cargando…</p>
+        </div>
+        <div class="admin-topbar__actions">
+          <span class="sync-dot" id="syncDot" hidden>En vivo</span>
+        </div>
+      </div>
+
+      <div class="detail-header" id="detailHeader">
+        <div>
+          <strong id="dhNombre">—</strong>
+          <p class="meta-line" id="dhMeta" style="margin-top:0.35rem"></p>
+        </div>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <button type="button" class="tab-btn is-active" data-tab="servicios">Facturas / servicios</button>
+        <button type="button" class="tab-btn" data-tab="citas">Citas</button>
+        <button type="button" class="tab-btn" data-tab="historial">Historial de pagos</button>
+      </div>
+
+      <!-- Servicios -->
+      <section class="panel-section is-active" id="tab-servicios">
+        <div class="toolbar">
+          <button type="button" class="btn btn--primary" id="btnAddService">+ Agregar servicio</button>
+          <input type="search" id="searchSvc" class="search-input" placeholder="Filtrar servicios…" />
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Servicio</th>
+                <th>Monto recibo</th>
+                <th>Comisión</th>
+                <th>Total</th>
+                <th>Corte</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="svcBody"></tbody>
+          </table>
+        </div>
+        <div class="service-mobile-list" id="svcMobile"></div>
+      </section>
+
+      <!-- Citas -->
+      <section class="panel-section" id="tab-citas">
+        <div class="toolbar">
+          <button type="button" class="btn btn--primary" id="btnAddCita">+ Agregar cita</button>
+        </div>
+        <div id="citasList"></div>
+      </section>
+
+      <!-- Historial -->
+      <section class="panel-section" id="tab-historial">
+        <div id="histList"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal servicio -->
+  <div class="modal-overlay" id="modalSvc" aria-hidden="true">
+    <div class="modal">
+      <div class="modal__header">
+        <h2 id="svcTitle">Agregar servicio</h2>
+        <button type="button" class="modal-close" data-close-modal>&times;</button>
+      </div>
+      <form id="formSvc" class="form">
+        <input type="hidden" id="svcId" />
+        <div class="form__group">
+          <label for="svcTramite">Trámite del catálogo *</label>
+          <select id="svcTramite" required></select>
+          <p class="form__hint">Se elige del catálogo de trámites (no se escribe a mano).</p>
+        </div>
+        <div class="form__row">
+          <div class="form__group">
+            <label for="svcMonto">Monto del recibo (₡) *</label>
+            <input id="svcMonto" type="number" min="0" step="0.01" required />
+            <p class="form__hint">Lo que cobra el proveedor (luz, agua, etc.).</p>
+          </div>
+          <div class="form__group">
+            <label for="svcComision">Nuestra comisión (₡) *</label>
+            <input id="svcComision" type="number" min="0" step="0.01" required value="0" />
+            <p class="form__hint">Cargo de PagoFácil por gestionar el pago.</p>
+          </div>
+        </div>
+        <div class="money-breakdown" id="svcBreakdown">
+          <div><span>Monto recibo</span><span id="bdMonto">₡0</span></div>
+          <div><span>Comisión</span><span id="bdComision">₡0</span></div>
+          <div class="total"><span>Total que paga el cliente</span><span id="bdTotal">₡0</span></div>
+        </div>
+        <div class="form__row">
+          <div class="form__group">
+            <label for="svcCorte">Día de corte (1–31)</label>
+            <input id="svcCorte" type="number" min="1" max="31" placeholder="Ej. 15" />
+          </div>
+          <div class="form__group">
+            <label for="svcEstado">Estado</label>
+            <select id="svcEstado">
+              <option value="pendiente">Pendiente</option>
+              <option value="pagado">Pagado</option>
+            </select>
+          </div>
+        </div>
+        <div class="form__group">
+          <label for="svcNotas">Notas</label>
+          <textarea id="svcNotas" rows="2"></textarea>
+        </div>
+        <div class="modal__actions">
+          <button type="button" class="btn--secondary" data-close-modal>Cancelar</button>
+          <button type="submit" class="btn btn--primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal cita -->
+  <div class="modal-overlay" id="modalCita" aria-hidden="true">
+    <div class="modal">
+      <div class="modal__header">
+        <h2 id="citaTitle">Agregar cita</h2>
+        <button type="button" class="modal-close" data-close-modal>&times;</button>
+      </div>
+      <form id="formCita" class="form">
+        <input type="hidden" id="citaId" />
+        <div class="form__group">
+          <label for="citaTramite">Trámite relacionado *</label>
+          <select id="citaTramite" required></select>
+        </div>
+        <div class="form__group">
+          <label for="citaTitulo">Título / descripción *</label>
+          <input id="citaTitulo" required placeholder="Ej. Cita control general" />
+        </div>
+        <div class="form__row">
+          <div class="form__group">
+            <label for="citaFecha">Fecha *</label>
+            <input id="citaFecha" type="date" required />
+          </div>
+          <div class="form__group">
+            <label for="citaHora">Hora</label>
+            <input id="citaHora" type="time" />
+          </div>
+        </div>
+        <div class="form__group">
+          <label for="citaEstado">Estado</label>
+          <select id="citaEstado">
+            <option value="confirmada">Confirmada</option>
+            <option value="pendiente">Pendiente</option>
+            <option value="completada">Completada</option>
+            <option value="cancelada">Cancelada</option>
+          </select>
+        </div>
+        <div class="form__group">
+          <label for="citaNotas">Notas</label>
+          <textarea id="citaNotas" rows="2"></textarea>
+        </div>
+        <div class="form__group">
+          <label for="citaArchivoUrl">Enlace al documento (opcional)</label>
+          <input id="citaArchivoUrl" type="url" placeholder="https://drive.google.com/…" />
+          <p class="form__hint">
+            Sin Firebase Storage: sube el PDF a Google Drive (o similar), compártelo y pega el enlace aquí.
+          </p>
+        </div>
+        <div class="form__group">
+          <label for="citaArchivoNombre">Nombre del documento (opcional)</label>
+          <input id="citaArchivoNombre" type="text" placeholder="Ej. Comprobante cita CCSS.pdf" />
+        </div>
+        <div class="modal__actions">
+          <button type="button" class="btn--secondary" data-close-modal>Cancelar</button>
+          <button type="submit" class="btn btn--primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <script type="module">
+    import { watchAuth, logout, requireRole } from "./js/auth-service.js";
+    import {
+      watchClient,
+      watchTramites,
+      watchClientServices,
+      addClientService,
+      updateClientService,
+      deleteClientService,
+      registerPayment,
+      watchPayments,
+      watchClientCitas,
+      addCita,
+      updateCita,
+      deleteCita,
+    } from "./js/data-service.js";
+    import {
+      escapeHtml,
+      formatCRC,
+      formatDate,
+      formatDateTime,
+      showToast,
+      openModal,
+      closeModal,
+      bindModal,
+      initAdminShell,
+      cutoffStatus,
+      whatsappReminderUrl,
+      debounce,
+    } from "./js/utils.js";
+
+    const params = new URLSearchParams(location.search);
+    const clientId = params.get("id");
+    if (!clientId) {
+      location.replace("admin-clientes.html");
+    }
+
+    let profile = null;
+    let client = null;
+    let tramites = [];
+    let services = [];
+    let citas = [];
+    let payments = [];
+    let svcFilter = "";
+
+    const modalSvc = document.getElementById("modalSvc");
+    const modalCita = document.getElementById("modalCita");
+    const formSvc = document.getElementById("formSvc");
+    const formCita = document.getElementById("formCita");
+    bindModal(modalSvc);
+    bindModal(modalCita);
+
+    // Tabs
+    document.querySelectorAll(".tab-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("is-active"));
+        document.querySelectorAll(".panel-section").forEach((p) => p.classList.remove("is-active"));
+        btn.classList.add("is-active");
+        document.getElementById("tab-" + btn.dataset.tab).classList.add("is-active");
+      });
+    });
+
+    function fillTramiteSelects() {
+      const opts =
+        `<option value="">Selecciona un trámite…</option>` +
+        tramites
+          .map(
+            (t) =>
+              `<option value="${escapeHtml(t.id)}" data-nombre="${escapeHtml(t.nombre)}" data-icono="${escapeHtml(
+                t.icono || "📄"
+              )}">${escapeHtml(t.icono || "")} ${escapeHtml(t.nombre)}</option>`
+          )
+          .join("");
+      formSvc.svcTramite.innerHTML = opts;
+      formCita.citaTramite.innerHTML = opts;
+    }
+
+    function updateBreakdown() {
+      const m = Number(formSvc.svcMonto.value) || 0;
+      const c = Number(formSvc.svcComision.value) || 0;
+      document.getElementById("bdMonto").textContent = formatCRC(m);
+      document.getElementById("bdComision").textContent = formatCRC(c);
+      document.getElementById("bdTotal").textContent = formatCRC(m + c);
+    }
+    formSvc.svcMonto.addEventListener("input", updateBreakdown);
+    formSvc.svcComision.addEventListener("input", updateBreakdown);
+
+    function renderHeader() {
+      if (!client) return;
+      document.getElementById("pageTitle").textContent = client.nombre || "Cliente";
+      document.getElementById("pageSub").textContent = client.email || "";
+      document.getElementById("dhNombre").textContent = client.nombre || "—";
+      document.getElementById("dhMeta").textContent = `${client.email || ""} · 📱 ${
+        client.telefono || "Sin teléfono"
+      } · ${client.activo === false ? "Inactivo" : "Activo"}`;
+    }
+
+    function badgeEstado(estado) {
+      if (estado === "pagado") return `<span class="badge badge--ok">Pagado</span>`;
+      return `<span class="badge badge--warn">Pendiente</span>`;
+    }
+
+    function renderServices() {
+      const q = svcFilter.trim().toLowerCase();
+      const list = services.filter(
+        (s) => !q || (s.nombre || "").toLowerCase().includes(q) || (s.estado || "").includes(q)
+      );
+
+      const body = document.getElementById("svcBody");
+      const mobile = document.getElementById("svcMobile");
+
+      if (!list.length) {
+        body.innerHTML = `<tr><td colspan="7">Sin servicios asignados.</td></tr>`;
+        mobile.innerHTML = `<div class="empty-state"><strong>Sin servicios</strong>Agrega un servicio vinculado al catálogo.</div>`;
+        return;
+      }
+
+      body.innerHTML = list
+        .map((s) => {
+          const cut = cutoffStatus(s.diaCorte);
+          const wa = whatsappReminderUrl({
+            telefono: client?.telefono,
+            clienteNombre: client?.nombre,
+            servicio: s.nombre,
+            monto: s.monto,
+            comision: s.comision,
+            total: s.total,
+            diaCorte: s.diaCorte,
+          });
+          return `<tr data-id="${escapeHtml(s.id)}">
+            <td><strong>${escapeHtml(s.icono || "")} ${escapeHtml(s.nombre)}</strong></td>
+            <td>${formatCRC(s.monto)}</td>
+            <td>${formatCRC(s.comision)}</td>
+            <td><strong>${formatCRC(s.total)}</strong></td>
+            <td><span class="badge badge--${cut.tone === "danger" ? "danger" : cut.tone === "warn" ? "warn" : cut.tone === "info" ? "info" : "muted"}">${escapeHtml(cut.label)}</span></td>
+            <td>${badgeEstado(s.estado)}</td>
+            <td class="row-actions">
+              ${wa && s.estado !== "pagado" ? `<a class="btn--whatsapp" href="${escapeHtml(wa)}" target="_blank" rel="noopener">WhatsApp</a>` : ""}
+              ${s.estado !== "pagado" ? `<button type="button" class="btn btn--primary btn--sm-admin" data-act="pay">Marcar pagado</button>` : ""}
+              <button type="button" class="btn--secondary btn--sm-admin" data-act="edit">Editar</button>
+              <button type="button" class="btn--danger btn--sm-admin" data-act="del">Eliminar</button>
+            </td>
+          </tr>`;
+        })
+        .join("");
+
+      mobile.innerHTML = list
+        .map((s) => {
+          const cut = cutoffStatus(s.diaCorte);
+          const wa = whatsappReminderUrl({
+            telefono: client?.telefono,
+            clienteNombre: client?.nombre,
+            servicio: s.nombre,
+            monto: s.monto,
+            comision: s.comision,
+            total: s.total,
+            diaCorte: s.diaCorte,
+          });
+          return `<div class="stack-card" data-id="${escapeHtml(s.id)}">
+            <strong>${escapeHtml(s.icono || "")} ${escapeHtml(s.nombre)}</strong>
+            <p class="meta-line">Recibo ${formatCRC(s.monto)} + comisión ${formatCRC(s.comision)} = <strong>${formatCRC(s.total)}</strong></p>
+            <p class="meta-line">${escapeHtml(cut.label)} · ${s.estado === "pagado" ? "Pagado" : "Pendiente"}</p>
+            <div class="row-actions" style="border:0;padding-top:0.5rem">
+              ${wa && s.estado !== "pagado" ? `<a class="btn--whatsapp" href="${escapeHtml(wa)}" target="_blank" rel="noopener">WhatsApp</a>` : ""}
+              ${s.estado !== "pagado" ? `<button type="button" class="btn btn--primary btn--sm-admin" data-act="pay">Marcar pagado</button>` : ""}
+              <button type="button" class="btn--secondary btn--sm-admin" data-act="edit">Editar</button>
+              <button type="button" class="btn--danger btn--sm-admin" data-act="del">Eliminar</button>
+            </div>
+          </div>`;
+        })
+        .join("");
+    }
+
+    function renderCitas() {
+      const el = document.getElementById("citasList");
+      if (!citas.length) {
+        el.innerHTML = `<div class="empty-state"><strong>Sin citas</strong>Agrega la primera cita del cliente.</div>`;
+        return;
+      }
+      el.innerHTML = citas
+        .map(
+          (c) => `
+        <div class="stack-card" style="margin-bottom:0.75rem" data-id="${escapeHtml(c.id)}">
+          <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:0.5rem">
+            <div>
+              <strong>${escapeHtml(c.icono || "📅")} ${escapeHtml(c.titulo)}</strong>
+              <p class="meta-line">${escapeHtml(c.fecha || "")} ${escapeHtml(c.hora || "")} · ${escapeHtml(
+            c.estado || ""
+          )}</p>
+              ${c.notas ? `<p class="meta-line">${escapeHtml(c.notas)}</p>` : ""}
+              ${
+                c.archivoUrl
+                  ? `<a class="tramite-card__link" href="${escapeHtml(c.archivoUrl)}" target="_blank" rel="noopener">📎 ${escapeHtml(
+                      c.archivoNombre || "Archivo"
+                    )}</a>`
+                  : ""
+              }
+            </div>
+            <div class="row-actions" style="border:0">
+              <button type="button" class="btn--secondary btn--sm-admin" data-act="edit-cita">Editar</button>
+              <button type="button" class="btn--danger btn--sm-admin" data-act="del-cita">Eliminar</button>
+            </div>
+          </div>
+        </div>`
+        )
+        .join("");
+    }
+
+    function renderHist() {
+      const el = document.getElementById("histList");
+      if (!payments.length) {
+        el.innerHTML = `<div class="empty-state"><strong>Sin pagos registrados</strong>Al marcar un servicio como pagado aparecerá aquí.</div>`;
+        return;
+      }
+      el.innerHTML = `
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Fecha</th><th>Servicio</th><th>Recibo</th><th>Comisión</th><th>Total</th><th>Notas</th></tr></thead>
+            <tbody>
+              ${payments
+                .map(
+                  (p) => `<tr>
+                  <td>${formatDateTime(p.pagadoAt)}</td>
+                  <td>${escapeHtml(p.servicioNombre || "")}</td>
+                  <td>${formatCRC(p.monto)}</td>
+                  <td>${formatCRC(p.comision)}</td>
+                  <td><strong>${formatCRC(p.total)}</strong></td>
+                  <td>${escapeHtml(p.notas || "—")}</td>
+                </tr>`
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>`;
+    }
+
+    watchAuth((user) => {
+      if (!user) {
+        location.replace("login.html");
+        return;
+      }
+      if (!requireRole(user, ["admin"])) return;
+      profile = user;
+      initAdminShell({
+        user,
+        onLogout: async () => {
+          await logout();
+          location.href = "login.html";
+        },
+      });
+
+      watchClient(clientId, (c) => {
+        client = c;
+        document.getElementById("syncDot").hidden = false;
+        if (!c) {
+          showToast("Cliente no encontrado", "err");
+          return;
+        }
+        renderHeader();
+        renderServices();
+      });
+
+      watchTramites((list) => {
+        tramites = list;
+        fillTramiteSelects();
+      });
+
+      watchClientServices(clientId, (list) => {
+        services = list;
+        renderServices();
+      });
+
+      watchClientCitas(clientId, (list) => {
+        citas = list;
+        renderCitas();
+      });
+
+      watchPayments(clientId, (list) => {
+        payments = list;
+        renderHist();
+      });
+    });
+
+    document.getElementById("searchSvc").addEventListener(
+      "input",
+      debounce((e) => {
+        svcFilter = e.target.value;
+        renderServices();
+      }, 150)
+    );
+
+    document.getElementById("btnAddService").addEventListener("click", () => {
+      if (!tramites.length) {
+        showToast("Primero crea trámites en el catálogo", "err");
+        return;
+      }
+      formSvc.reset();
+      formSvc.svcId.value = "";
+      formSvc.svcComision.value = "0";
+      formSvc.svcEstado.value = "pendiente";
+      document.getElementById("svcTitle").textContent = "Agregar servicio";
+      updateBreakdown();
+      openModal(modalSvc);
+    });
+
+    document.getElementById("btnAddCita").addEventListener("click", () => {
+      if (!tramites.length) {
+        showToast("Primero crea trámites en el catálogo", "err");
+        return;
+      }
+      formCita.reset();
+      formCita.citaId.value = "";
+      document.getElementById("citaTitle").textContent = "Agregar cita";
+      openModal(modalCita);
+    });
+
+    async function onServiceAction(act, id) {
+      const s = services.find((x) => x.id === id);
+      if (!s) return;
+
+      if (act === "edit") {
+        formSvc.svcId.value = s.id;
+        formSvc.svcTramite.value = s.tramiteId || "";
+        formSvc.svcMonto.value = s.monto ?? 0;
+        formSvc.svcComision.value = s.comision ?? 0;
+        formSvc.svcCorte.value = s.diaCorte || "";
+        formSvc.svcEstado.value = s.estado || "pendiente";
+        formSvc.svcNotas.value = s.notas || "";
+        document.getElementById("svcTitle").textContent = "Editar servicio";
+        updateBreakdown();
+        openModal(modalSvc);
+      }
+
+      if (act === "del") {
+        if (!confirm(`¿Eliminar servicio "${s.nombre}"?`)) return;
+        try {
+          await deleteClientService(id);
+          showToast("Servicio eliminado");
+        } catch (e) {
+          showToast(e.message || "Error", "err");
+        }
+      }
+
+      if (act === "pay") {
+        if (!confirm(`¿Registrar pago de ${s.nombre} por ${formatCRC(s.total)}?`)) return;
+        try {
+          await registerPayment({ service: s, adminUid: profile.uid, notas: "Pago gestionado por admin" });
+          showToast("Pago registrado en el historial");
+        } catch (e) {
+          showToast(e.message || "Error", "err");
+        }
+      }
+    }
+
+    document.getElementById("svcBody").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-act]");
+      if (!btn) return;
+      const id = btn.closest("[data-id]")?.dataset.id;
+      onServiceAction(btn.dataset.act, id);
+    });
+    document.getElementById("svcMobile").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-act]");
+      if (!btn) return;
+      const id = btn.closest("[data-id]")?.dataset.id;
+      onServiceAction(btn.dataset.act, id);
+    });
+
+    document.getElementById("citasList").addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-act]");
+      if (!btn) return;
+      const id = btn.closest("[data-id]")?.dataset.id;
+      const c = citas.find((x) => x.id === id);
+      if (!c) return;
+
+      if (btn.dataset.act === "edit-cita") {
+        formCita.citaId.value = c.id;
+        formCita.citaTramite.value = c.tramiteId || "";
+        formCita.citaTitulo.value = c.titulo || "";
+        formCita.citaFecha.value = c.fecha || "";
+        formCita.citaHora.value = c.hora || "";
+        formCita.citaEstado.value = c.estado || "confirmada";
+        formCita.citaNotas.value = c.notas || "";
+        formCita.citaArchivoUrl.value = c.archivoUrl || "";
+        formCita.citaArchivoNombre.value = c.archivoNombre || "";
+        document.getElementById("citaTitle").textContent = "Editar cita";
+        openModal(modalCita);
+      }
+
+      if (btn.dataset.act === "del-cita") {
+        if (!confirm("¿Eliminar esta cita?")) return;
+        try {
+          await deleteCita(id);
+          showToast("Cita eliminada");
+        } catch (err) {
+          showToast(err.message || "Error", "err");
+        }
+      }
+    });
+
+    formSvc.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const opt = formSvc.svcTramite.selectedOptions[0];
+      if (!opt || !opt.value) {
+        showToast("Selecciona un trámite", "err");
+        return;
+      }
+      const payload = {
+        clientId,
+        tramiteId: opt.value,
+        nombre: opt.dataset.nombre || opt.textContent.trim(),
+        icono: opt.dataset.icono || "📄",
+        monto: formSvc.svcMonto.value,
+        comision: formSvc.svcComision.value,
+        diaCorte: formSvc.svcCorte.value,
+        estado: formSvc.svcEstado.value,
+        notas: formSvc.svcNotas.value,
+      };
+      try {
+        if (formSvc.svcId.value) {
+          await updateClientService(formSvc.svcId.value, payload);
+          showToast("Servicio actualizado");
+        } else {
+          await addClientService(payload);
+          showToast("Servicio agregado al cliente");
+        }
+        closeModal(modalSvc);
+      } catch (err) {
+        showToast(err.message || "Error", "err");
+      }
+    });
+
+    formCita.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const opt = formCita.citaTramite.selectedOptions[0];
+      if (!opt || !opt.value) {
+        showToast("Selecciona un trámite", "err");
+        return;
+      }
+      const payload = {
+        clientId,
+        tramiteId: opt.value,
+        titulo: formCita.citaTitulo.value,
+        icono: opt.dataset.icono || "📅",
+        fecha: formCita.citaFecha.value,
+        hora: formCita.citaHora.value,
+        estado: formCita.citaEstado.value,
+        notas: formCita.citaNotas.value,
+        archivoUrl: formCita.citaArchivoUrl.value,
+        archivoNombre: formCita.citaArchivoNombre.value,
+      };
+      try {
+        if (formCita.citaId.value) {
+          await updateCita(formCita.citaId.value, payload);
+          showToast("Cita actualizada");
+        } else {
+          await addCita(payload);
+          showToast("Cita creada");
+        }
+        closeModal(modalCita);
+      } catch (err) {
+        console.error(err);
+        showToast(err.message || "Error al guardar cita", "err");
+      }
+    });
+  </script>
+</body>
+</html>
