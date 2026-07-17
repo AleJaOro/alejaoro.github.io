@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard · Trámites | PagoFácil Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body class="admin-body">
+  <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
+
+  <div class="admin-shell">
+    <aside class="admin-sidebar" id="adminSidebar">
+      <a href="admin.html" class="logo">
+        <span class="logo__mark">P</span>
+        <span class="logo__text">Pago<span>Fácil</span></span>
+      </a>
+      <nav class="admin-nav" aria-label="Admin">
+        <a href="admin.html" class="is-active">
+          <span aria-hidden="true">🗂️</span> Dashboard
+        </a>
+        <a href="instrucciones.html">
+          <span aria-hidden="true">📖</span> Instrucciones
+        </a>
+        <a href="index.html" target="_blank" rel="noopener">
+          <span aria-hidden="true">🌐</span> Ver sitio
+        </a>
+      </nav>
+      <div class="admin-sidebar__footer">
+        <div class="admin-user">
+          Sesión
+          <strong id="adminUserName">Admin</strong>
+        </div>
+        <button type="button" class="btn--sidebar" id="btnLogout">Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <div class="admin-topbar">
+        <div>
+          <button type="button" class="admin-menu-btn" id="btnMenu" aria-label="Abrir menú">☰ Menú</button>
+          <h1>Dashboard de trámites</h1>
+          <p>Lista de servicios con enlace a la web oficial. Puedes añadir, editar o eliminar trámites.</p>
+        </div>
+        <div class="admin-topbar__actions">
+          <button type="button" class="btn btn--primary" id="btnNuevoTramite">+ Nuevo trámite</button>
+        </div>
+      </div>
+
+      <div class="admin-stats">
+        <div class="stat-card">
+          <span>Trámites</span>
+          <strong id="statTramites">0</strong>
+        </div>
+        <div class="stat-card">
+          <span>Instrucciones</span>
+          <strong id="statInstrucciones">0</strong>
+        </div>
+        <div class="stat-card">
+          <span>Enlaces activos</span>
+          <strong id="statEnlaces">0</strong>
+        </div>
+      </div>
+
+      <div id="tramitesGrid" class="tramites-grid" aria-live="polite"></div>
+    </main>
+  </div>
+
+  <!-- Modal trámite -->
+  <div class="modal-overlay" id="modalTramite" role="dialog" aria-modal="true" aria-labelledby="modalTramiteTitle">
+    <div class="modal">
+      <div class="modal__header">
+        <h2 id="modalTramiteTitle">Nuevo trámite</h2>
+        <button type="button" class="modal-close" data-close-modal aria-label="Cerrar">&times;</button>
+      </div>
+      <form id="formTramite" class="form" novalidate>
+        <input type="hidden" id="tramiteId" name="id" />
+        <div class="form__group">
+          <label for="tramiteNombre">Nombre del servicio *</label>
+          <input type="text" id="tramiteNombre" name="nombre" required placeholder="Ej. Electricidad ICE" maxlength="120" />
+        </div>
+        <div class="form__group">
+          <label for="tramiteIcono">Icono (emoji)</label>
+          <input type="text" id="tramiteIcono" name="icono" placeholder="⚡" maxlength="4" />
+        </div>
+        <div class="form__group">
+          <label for="tramiteDescripcion">Descripción breve</label>
+          <textarea id="tramiteDescripcion" name="descripcion" rows="2" placeholder="Qué se puede hacer con este trámite" maxlength="300"></textarea>
+        </div>
+        <div class="form__group">
+          <label for="tramiteEnlace">Enlace a la web oficial *</label>
+          <input type="url" id="tramiteEnlace" name="enlace" required placeholder="https://ejemplo.go.cr/" />
+        </div>
+        <div class="modal__actions">
+          <button type="button" class="btn--secondary" data-close-modal>Cancelar</button>
+          <button type="submit" class="btn btn--primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <script src="auth.js"></script>
+  <script src="storage.js"></script>
+  <script src="admin-ui.js"></script>
+  <script src="admin-dashboard.js"></script>
+</body>
+</html>
